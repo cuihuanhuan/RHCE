@@ -1,0 +1,2160 @@
+什么是OpenSSH Secure Shell（ssh）？
+OpenSSH Secure Shell（ssh）用于在远程系统上安全运行shell，如果您提供ssh服务的远程linux系统中的拥有用户账户，则ssh是通常用来远程登录到该系统的命令，ssh命令也可用于在远程系统中运行各个命令。
+以当前用户身份创建远程交互式shell，然后在结束时使用exit命令返回到之前的shell：ssh remotehost  exit
+以其他用户身份在选定主机上连接到某一远程shell：ssh remoteuser@remotehost
+以远程用户身份在远程主机上通过将输出返回到本地显示器的方式来执行单一命令：ssh remoteuser@remotehost hostname
+w命令可显示当前登录到计算机的用户列表
+telnet：端口号23，密码会被明文发送，数据内容也是明文传输的
+ssh：端口号22，使用公私钥来进行身份验证，以及产生会话的共享密钥，数据内容加密
+假如要更改SSH的默认端口（22），那么你只要修改：/etc/ssh/sshd_config中Port 22，这里把22改成自己要设的端口就行了，不过千万别设和现已有的端口相同，以防造成未知后果。
+首先修改配置文件
+　　vi /etc/ssh/sshd_config
+　　找到#Port 22一段，这里是标识默认使用22端口，修改为如下：
+　　Port 22
+　　Port 2222
+   然后保存退出
+　　执行systemctl restart sshd
+　　这样SSH端口将同时工作与22和2222上。
+　　现在编辑防火墙配置：firewall-cmd --permament --add-port=2222/tcp  firewall-cmd --reload
+         设置端口selinux：semanage port -a -t ssh_port_t -p tcp 2222
+　　现在请使用ssh工具连接2222端口，来测试是否成功。如果连接成功了，则再次编辑sshd_config的设置，将里边的Port22删除即可。
+　　之所以先设置成两个端口，测试成功后再关闭一个端口，是为了方式在修改conf的过程中，万一出现掉线、断网、误操作等未知情况时候，还能通过另外一个端口连接上去调试以免发生连接不上必须派人去机房，导致问题更加复杂麻烦。
+假如要限制SSH登陆的IP，可以先修改/etc/hosts.deny，在其中加入sshd:ALL ，然后修改：/etc/hosts.allow，在其中进行如下设置：sshd:192.168.0.241 
+
+	 
+对称加密：
+	加密和触密使用同一个密钥
+非对称加密：
+	有两个密钥，一个公钥，一个私钥。
+	用公钥加密的数据，有且只有私钥能解密
+	/etc/ssh/ssh_host_ecdsa_key /etc/ssh/ssh_host_ecdsa_key.pub  
+	/etc/ssh/ssh_host_rsa_key /etc/ssh/ssh_host_rsa_key.pub   两种算法：RSA，DSA
+ 
+认证方式：
+基于账号和密码的验证方式，对称加密
+基于公钥的验证方式，非对称加密
+	 
+基于账号和密码的验证
+
+ 
+	 
+在服务端，开启SSH服务，会自动生成密钥对：/etc/ssh/ssh_host*。比如：删除已经存在的密钥，然后重启SSHD服务，发现又重新生成了密钥对。
+	 
+验证过程：
+1.client通过SSH客户端软件，向server端发送连接请求
+2.server收到连接请求，会把自己的公钥以明文方式发送给client
+3.client收到后：
+	（1）如果是第一次连接，会提示要不要继续，就是问你要不要接收这个公钥，因为这个公钥有可能是中间人提供的，需要你通过公钥的fingerprint去查证这个公钥有没有问题，(在server端通过：ssh-keygen -lf /etc/ssh/ssh_host_ecdsa_key.pub命令就可以查到这个公钥的fingerprint值)。输入yes，确认接收后，保存到当前用户的家目录下(~/.ssh/known_hosts)
+	（2）如果client之前已经保存过server公钥，再次连接时，不会再提示，但是会去比对接收到的公钥和已经保存的公钥，比对成功，就进入密码验证阶段，如果比对不成功，则提醒，并退出连接。比如：服务器重新生成了新的密钥对，再次连接服务器时，需要先将client端的~/.ssh/know_hosts这个文件里记录的旧公钥删除才行。
+	注：如果第一次登陆时，不想它提示，可用以下方法：ssh -o StrictHostKeyChecking=no root@server
+4.进入密码验证阶段，client端用server的公钥对输入的密码进行加密，并发送给server
+5.server收到后，用自己的私钥解密，密码正确，允许登陆。
+ 
+基于公钥验证（无密码验证）
+
+ 
+	 
+如果一个client，想通过公钥认证的方式连接到一台server，需要在client端先生成一个密钥对，包括一个公钥和一个私钥，然后将公钥复制到server端。
+	 
+验证过程：
+当client通过SSH连接server时，首先发送自己的公钥到server
+server收到这个公钥后，和自己本地存储的client的公钥进行比对，比对成功，就用client的公钥加密一段随机数，并发送给client
+client收到后，用自己的私钥解密，并将解密后的内容发还给server
+serve收到数据后，和之前生成的随机数进行比对，比对成功，表示client可信，从而建立一条安全通道。
+这就是一个公钥认证过程，其间不需要用户手工输入密码。
+
+SSH主机密钥
+SSH通过公钥加密的方式保持通信安全，当某一ssh客户端连接到SSH服务器时，在该客户端登录之前，服务器会向其发送公钥副本，这可用于设置通信渠道的安全加密 ，并可验证客户端的服务器。
+当用户第一次使用ssh连接到特定服务器时，ssh命令会在用户（指当前登录shell的用户）的~/.ssh/known_hosts文件中存储该服务器的公钥，在此之后每当用户进行连接时，客户端都会通过对比~/.ssh/known_hosts文件中的服务器条目和服务器发送的公钥，确保从服务器获得相同的公钥，如果公钥不匹配，客户端会假定网络通信已遭劫持或服务器已被入侵，并且中断连接。这就意味着，当服务器的公钥发生更改时，用户则需要更新其~/.ssh/known_hosts文件并删除旧的条目才能够进行登录。
+主机ID存储在本地客户端系统上的~/.ssh/known_hosts中；主机密钥存储在SSH服务器上的/etc/ssh/ssh_host_key*中。
+一个更好的办法是：在公钥发生更改前，提前将服务器的ssh_host_*key.pub文件匹配的条目添加到用户~/.ssh/known_hosts或系统范围内的/etc/ssh/ssh_known_hosts
+[student@desktop0 ~]$ cd .ssh
+[student@desktop0 .ssh]$ ll
+total 4
+-rw-------. 1 student student 1651 Jul 11  2014 authorized_keys
+[student@desktop0 .ssh]$ ssh student@server0
+The authenticity of host 'server0 (172.25.0.11)' can't be established.
+ECDSA key fingerprint is eb:24:0e:07:96:26:b1:04:c2:37:0c:78:2d:bc:b0:08.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added 'server0,172.25.0.11' (ECDSA) to the list of known hosts.
+student@server0's password: 
+Last login: Tue Jul 31 04:40:45 2018 from 172.25.0.200
+[student@server0 ~]$ exit
+logout
+Connection to server0 closed.
+[student@desktop0 .ssh]$ ll
+total 8
+-rw-------. 1 student student 1651 Jul 11  2014 authorized_keys
+-rw-r--r--. 1 student student  181 Jul 31 04:50 known_hosts
+[student@desktop0 .ssh]$ cat known_hosts 
+server0,172.25.0.11 ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBHX+o9KAnlfw2dE7CsmM4hqfv1udM79a5NWC2BuWlmfKSwfYLptPQMJF8bnqaz0EjDlxCxRu/aito+GphPLzp/k=
+[student@desktop0 .ssh]$ ssh root@server0
+root@server0's password: 
+Last login: Tue Jul 31 04:42:43 2018
+[root@server0 ~]# exit
+[root@server0 ~]# cat /etc/ssh/ssh_host_ecdsa_key.pub
+ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBHX+o9KAnlfw2dE7CsmM4hqfv1udM79a5NWC2BuWlmfKSwfYLptPQMJF8bnqaz0EjDlxCxRu/aito+GphPLzp/k= 
+
+基于SSH密钥的身份验证
+用户可以对ssh登录进行身份验证而无需输入密码，使用公钥身份验证即可。ssh允许用户使用私钥-公钥方案进行身份验证。私钥文件用作身份验证凭据，像密码一样，公钥复制到用户希望登录的系统，用于验证私钥。
+使用ssh-keygen命令生成密钥，这将生成私钥~/.ssh/id_rsa(600)和公钥~/.ssh/id_rsa.pub(644)
+在可以使用基于密钥的身份验证之前，需要将公钥复制到目标系统上，用ssh-copy-id来完成，-i指定公钥文件。
+1.在client端生成一个密钥对
+ssh-keygen	
+#生成的密钥对存放在当前用户的家目录下。
+#如：当前是root，私钥：/root/.ssh/id_rsa；公钥：/root/.ssh/id_rsa.pub
+2.把公钥传给server的对应用户，并将公钥改名
+ssh-copy-id root@server0
+#将公钥传给server，并将公钥内容写入到server端的：/root/.ssh/authorized_keys文件内。
+[student@desktop0 .ssh]$ ssh-keygen
+Generating public/private rsa key pair.
+Enter file in which to save the key (/home/student/.ssh/id_rsa): 
+Enter passphrase (empty for no passphrase): 
+Enter same passphrase again: 
+Your identification has been saved in /home/student/.ssh/id_rsa.
+Your public key has been saved in /home/student/.ssh/id_rsa.pub.
+The key fingerprint is:
+a5:41:3b:ed:16:a7:87:fd:12:1b:51:a3:4c:6f:9c:27 student@desktop0.example.com
+The key's randomart image is:
++--[ RSA 2048]----+
+|        .   . o  |
+|       . o o = o |
+|        + + = E .|
+|         * * o o |
+|        S = =    |
+|         . . =   |
+|            o .  |
+|             .   |
+|                 |
++-----------------+
+[student@desktop0 .ssh]$ ll
+total 16
+-rw-------. 1 student student 1651 Jul 11  2014 authorized_keys
+-rw-------. 1 student student 1675 Jul 31 05:03 id_rsa
+-rw-r--r--. 1 student student  410 Jul 31 05:03 id_rsa.pub
+-rw-r--r--. 1 student student  181 Jul 31 04:52 known_hosts
+[student@desktop0 .ssh]$ ssh-copy-id server0
+/usr/bin/ssh-copy-id: INFO: attempting to log in with the new key(s), to filter out any that are already installed
+/usr/bin/ssh-copy-id: INFO: 1 key(s) remain to be installed -- if you are prompted now it is to install the new keys
+student@server0's password: 
+
+Number of key(s) added: 1
+
+Now try logging into the machine, with:   "ssh 'server0'"
+and check to make sure that only the key(s) you wanted were added.
+
+[student@desktop0 .ssh]$ cat id_rsa.pub 
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCidyeB4tYLnopaUEobUH4fd2LApyiGPypkrbjh/P1Yt7BYVgSvuPPMlGDyI2BLInMa5rwVPHdG5+bmz0cfu2eSpdOo5KcsEyAqZOjKYO4y/NVhSCSgcaUHXrnv6N3RQEkMfqPOe5My7+6eSJUmY2P5WEapEUAT9qjNdpu5TutBy9GyECA3FcSEx2FwoGam1SBSIJxo2zR5t4mPH/ZmcmbdnFZ0IxsMxX/KMk1GSxG+NOrFHlonPU8sBKqEkD5Hu37DCQZX8LL55oqqaStb3a3g5OThUWo7xOnQ4eWKGvi6l1g15GuIPJiql4LSu8rlG4RXxI4AdfzOw2s6bQZ3AA01 student@desktop0.example.com
+[student@desktop0 .ssh]$ ssh student@server0
+Last login: Tue Jul 31 04:50:06 2018 from desktop0.example.com
+
+[student@server0 .ssh]$ ll
+total 8
+-rw-------. 1 student student 410 Jul 31 05:06 authorized_keys
+-rw-r--r--. 1 student student 181 Jul 27 05:10 known_hosts
+[student@server0 .ssh]$ cat authorized_keys 
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCidyeB4tYLnopaUEobUH4fd2LApyiGPypkrbjh/P1Yt7BYVgSvuPPMlGDyI2BLInMa5rwVPHdG5+bmz0cfu2eSpdOo5KcsEyAqZOjKYO4y/NVhSCSgcaUHXrnv6N3RQEkMfqPOe5My7+6eSJUmY2P5WEapEUAT9qjNdpu5TutBy9GyECA3FcSEx2FwoGam1SBSIJxo2zR5t4mPH/ZmcmbdnFZ0IxsMxX/KMk1GSxG+NOrFHlonPU8sBKqEkD5Hu37DCQZX8LL55oqqaStb3a3g5OThUWo7xOnQ4eWKGvi6l1g15GuIPJiql4LSu8rlG4RXxI4AdfzOw2s6bQZ3AA01 student@desktop0.example.com
+
+	 
+ssh命令
+ssh root@10.0.0.1
+ssh -X root@10.0.0.1
+	#-X 表示ssh过去之后，可以打开图形化工具，比如；nm-connection-editor
+ssh root@10.0.0.1 ls /boot
+	#并不是真的登陆到对方，只是执行一条命令，然后退出
+ssh root@10.0.0.1 -p 22
+	#假如ssh服务更改过端口，需要用-p去指定端口
+ 
+scp命令
+在传输过程中，拷贝文件会被加密
+scp /tmp/tt root@10.0.0.1:/tmp/
+	# 把本地的文件拷到远程机器
+scp root@10.0.0.1:/tmp/tt /tmp
+     #把远程机器的文件拷到本地
+	 
+密钥错误的解决方法
+SSHD服务启动时，会先去查看/etc/ssh目录下有没有密钥对，如果没有，就会自动生成密钥对。
+ 
+1.账号密码验证方式错误
+如果删除server端的密钥对，重启sshd服务，又会自动重新生成。这时，客户端就没法再登陆了，因为客户端保存的是旧的公钥，客户端需要删除旧的，再重新获取。
+ 
+2.公钥验证方式错误
+如果client重新执行了ssh-keygen，会覆盖旧密钥对，公钥认证就失效了。需要先到server端，删掉旧的密钥：/root/.ssh/authorized_keys，再重新copy
+ 
+禁止root用户使用SSH登录
+vim /etc/ssh/sshd_config
+	PermitRootLogin yes 
+	#将这里的yes改成no，重启sshd服务，root就不可登陆
+	PermitRootLogin without-password
+	#仅允许以root身份进行基于密钥的ssh登录
+禁止使用SSH进行密码身份验证
+vim /etc/ssh/sshd_config
+	PasswordAuthentication no
+	#把yes改成no，重启sshd服务后生效
+注：这样也就是说仅允许基于密钥验证
+
+实验：P212
+
+系统日志
+进程和操作系统内核需要能够为发生的时间记录日志，这些日志可用于系统审核和问题的故障排除，按照惯例，这些日志永久存储在/var/log目录中。
+RHEL7中的系统日志消息由2个服务负责处理，它们是systemd-journald和rsyslog。
+[root@server0 ~]# systemctl list-units -t service | grep rsyslog
+rsyslog.service                    loaded active running System Logging Service
+[root@server0 ~]# systemctl list-units -t service | grep systemd-journald
+systemd-journald.service           loaded active running Journal Service
+
+systemd-journald，该守护进程提供一种改进的日志管理服务，可以收集来自内核，启动过程的早期阶段、标准输出、系统日志，以及守护进程启动和运行期间错误的消息，它将这些消息写入到一个结构化事件日志中，默认情况下不在重新启动之间保留。系统日志消息也可由systemd-journald转发到rsyslog以做进一步的处理。特点：它是直接由systemd产生，而systemd是系统启动第一个被启动的进程，所以系统启动过程中，可以直接调用它来记录日志，但它记录的日志只是保存在内存中，所以最好还是和rsyslog配合使用。
+
+rsyslog服务随后根据类型（或设备）和优先级排列系统日志消息，将它们写入到/var/log目录内永久文件中。特点：需要服务起来后，才能工作，比如，开机过程的日志，它是没办法记录的，在rhel7之前，内核还要自己产生一个klogd的服务来记录开机过程日志，然后等rsyslog服务启动后，再传给它处理。
+/var/log目录保管由rsyslog维护的各种特定于系统和服务的日志文件。
+
+
+boot.log
+	#开机的时候，内核会去检测硬件，然后加载内核功能模块等，这个过程都会记录在这个日志文件里，但是会覆盖上次的记录
+cron
+	#计划任务的日志
+dmesg
+	#开机时候，内核检测硬件产生的日志,
+	显示linux内核的环形缓冲区信息，我们可以从中获得诸如系统架构、cpu、挂载的硬件，RAM等多个运行级别的大量的系统信息。当计算机启动时，系统内核（操作系统的核心部分）将会被加载到内存中。在加载的过程中会显示很多的信息，在这些信息中我们可以看到内核检测硬件设备。
+lastlog
+	#记录系统上所有账号最近一次登陆的信息
+mail
+	#邮件相关日志
+messages	
+	#几乎系统发生的错误信息都会记录在这个文件中
+secure
+	#只要和验证（输入账号密码）相关的日志都记录在这个文件，包括su,sudo,ssh,telnet
+wtmp或faillog
+	#登陆时的正解或错误信息
+	 
+系统日志文件
+
+同一个服务所产生的日志，也是有差别，按等级分为0-7，共8个级别
+1-3级别的日志，系统已经很危险了
+4-7级别的日志，还不会影响系统正常工作
+服务：rsyslog.service
+rsyslog记录的日志大多和服务有关、安全、日常信息的日志，存放在/var/log目录下，把相应的记录放到对应的文件 
+rsyslog配置文件通过/etc/rsyslog.conf文件以及/etc/rsyslog.d中的*.conf文件来配置，程序和管理员可以将带有.conf后缀的自定义文件放入/etc/rsyslog.d目录，以更改rsyslogd配置而不被rsyslog更新所覆盖。
+/etc/rsyslog.conf的#### RULES ####部分定义日志消息保存位置和相关指令，（定义了:什么服务的什么等级日志记录到哪个文件）每行左侧表示与指令匹配的日志消息的设备和严重性，rsyslog.conf文件的设备和严重性字段中可能包含*字符作为通配符，代表所有设备或所有严重性级别，每行右侧表示要将日志消息保存到的文件，日志消息通常保存在/var/log目录内的文件中。
+ 
+配置格式
+服务名称.[=!]等级 文件
+	#.表示大于等于后面的等级
+	#=表示完全等于后面的等级，其它不记录
+	#！表示除了后面的等级，其它都记录 
+注意：如果将多个服务记录到同一个文件，用分号（;）隔开
+也可以将严重性字段设为none，表示定向到这一设备的所有消息都不添加到指定的日志文件中。
+ 
+vim /etc/rsyslog.conf
+	mail.info /var/log/mail_info
+	#表示将mail服务的info等级以上的日志都记录到/var/log/mail_info这个文件中
+	mail.=info /var/log/mail1
+	#表示只记录mail服务的info日志
+	mail.!info /var/log/mail2
+	#表示将mail服务，除了info级别以上的日志，其它都记录
+	mail.!=info /var/log/mail3
+	#表示除了info级别，其它级别都记录
+	mail.info;ftp.info /var/log/tt
+	#表示将mail和ftp两个服务的info以上等级日志，都记录到同一个文件 
+	*.*;mail.none /var/log/test.log
+	#表示除了mail的日志，其它服务的日志都记录到同一个文件
+ 
+
+日志文件轮转
+日志通过logrotate使用工具“轮转”，以防止他们将包含/var/log的文件系统填满，轮转日志文件时，使用扩展名对其进行重命名，扩展名中指示轮转日期。
+轮转日志文件后，会创新日志文件，并通过对它执行写操作的服务。轮转若干次之后（通常在4周之后）丢弃原日志文件以释放磁盘空间，cron作业每日运行一次logrotate程序，以查看是否有任何日志需要轮转，大多数日志文件每周轮转一次，但是logrotate轮转文件的速度有时快，有时慢，或在文件达到特定大小时进行轮转。
+比如：ls /var/log/message*，可能看到有几个文件
+轮转有它自己的规则：
+	比如：一个月轮替一次，messages记录一个月的日志，下个月就把这个文件mv成messages20160522，然后新生成一个新的messages文件，这样就是一个月一个文件
+	保持日志规划：保持多少份旧日志
+	日志的大小轮替：根据日志文件的大小，考虑要不要做轮替
+	 
+cat /etc/cron.daily/logrotate   
+	/usr/bin/logger -t  logrotate******
+	#cron.daily这个目录表示每天会去执行这个目录下的文件里面的命令，虽然每天会执行轮替命令，只有达到规则的才轮替，比如大小，如果日志文件没有达到规则指定大小，就不轮替
+	 
+轮转命令
+logrotate -vf /etc/rsyslog.conf  
+	#手动轮替rsyslog的日志
+ 
+轮转配置文件
+vim /etc/logrotate.conf
+	weekly
+	#每周执行一次rotate
+	rotate 4
+	#保留4份
+	create
+	#由于旧日志文件已经被改名，新建一个文件存储
+	dateext
+	#设定将旧日志文件改名时加上日期
+	注意：上面的规则针对所有的日志文件有效，
+ 
+	/var/log/wtmp 
+	#针对/var/log/wtmp所作的设置
+	    monthly
+		#每月执行一次，替代前面的每周
+	    create 0664 root utmp
+		#指定新建的文件权限及所属用户、组
+		minsize 1M
+		#指定只当文件超过1M才做rotate，即使时间到了
+	    rotate 1
+		#保留一个旧文件
+
+[root@server0 rsyslog.d]# cat /etc/logrotate.conf
+# see "man logrotate" for details
+# rotate log files weekly
+weekly
+
+# keep 4 weeks worth of backlogs
+rotate 4
+
+# create new (empty) log files after rotating old ones
+create
+
+# use date as a suffix of the rotated file
+dateext
+
+# uncomment this if you want your log files compressed
+#compress
+
+# RPM packages drop log rotation information into this directory
+include /etc/logrotate.d
+
+# no packages own wtmp and btmp -- we'll rotate them here
+/var/log/wtmp {
+    monthly
+    create 0664 root utmp
+	minsize 1M
+    rotate 1
+}
+
+/var/log/btmp {
+    missingok
+    monthly
+    create 0600 root utmp
+    rotate 1
+}
+
+分析系统日志条目
+cat /var/log/mesage
+日志以空格分段
+1-3，时间日期 记录该日志条目的事件戳
+4，主机名 发送该日志消息的主机
+5，服务名  发送该日志消息的程序或进程
+6及之后 具体内容  发送的实际消息
+
+利用tail监控日志文件
+监控事件的一个或多个日志文件，这对重现问题特别有帮助，tail -f /path/to/file命令输出指定文件的最后10行，并在新行写入到被监控文件中时继续输出它们。
+
+使用发送系统日志消息logger
+logger命令可发送消息到rsyslog服务，默认情况下，它将严重性为notice（user.notice）的消息发送给设备用户，除非通过-p选项另外指定，测试对rsyslog配置的更改将特别有用。
+[root@server0 etc]# cat /etc/rsyslog.conf 
+# Save boot messages also to boot.log
+local7.*                                                /var/log/boot.log
+[root@server0 etc]# logger -p local7.notice "log entry created on server0"
+[root@server0 ~]# tail -f /var/log/boot.log 
+[  OK  ] Started Kernel Samepage Merging (KSM) Tuning Daemon.
+[  OK  ] Started LSB: Start the ipr init daemon.
+         Starting LSB: Start the ipr dump daemon...
+[  OK  ] Started LSB: Start the ipr dump daemon.
+[  OK  ] Started Avahi mDNS/DNS-SD Stack.
+[  OK  ] Started RealtimeKit Scheduling Policy Service.
+[  OK  ] Started Login Service.
+[  OK  ] Started GNOME Display Manager.
+         Starting Authorization Manager...
+[  OK  ] Started Modem Manager.
+Nov 20 17:38:52 server0 root: log entry created on server0
+
+通过查找事件journalctl
+systemd日志将日志数据存储在带有索引的结构化二进制文件中，此数据包含与日志事件相关的额外信息。在RHEL7中，systemd日志默认存储在/run/log/journal中，其内容会在重启后予以清除。
+服务：systemd-journald.service
+由systemd提供，所有经systemd管理的服务日志都由它以二进制的方式记录在内存中，然后传给rsyslog作进一步处理
+journal记录的是系统的报错信息，或服务启动的时候的日志，存放在内存中，映射目录：/run/log/journal
+/run/log/jounal/ 这个目录下的文件是内存文件，只可用journalctl命令查看，不能使用cat查看
+journalctl命令以粗体文本突出显示优先级为notice或warning的消息，以红色文本突出显示优先级为error和更高的消息
+ 
+journalctl -n 5 
+	#查看后5行，默认只显示最后10个日志条目
+journalctl -f 
+	#动态查看输出日志的最后10行，并在新日志条目写入到日志中继续输出它们
+journalctl -p err|info|debug|notice|warning|crit|alert|emerg
+	#指定错误级别日志  -p可以接受已知优先级的名称或编号作为参数
+journalctl --since “2016-01-01 00:00:00” --until “2016-03-01 00:00:00” 
+	#查看2016年1月1日到2016年3月1日的日志，注意journal日志，关机就没了，所以注意时间。如果省略日期，则命令会假定日期为当天，如果省略时间部分，则
+	假定为自00:00:00起的一整天，除了日期和时间字段外，还接受yesterday、today和tomorrow作为有效的参数。
+其他用于搜索关于特定进程或事件的行为选项还有：
+_COMM 命令的名称  _PID进程的ID   _UID运行该进程的用户的UID   _SYSTEMD_UNIT启动该进程的systemd的单元
+[root@server0 journal]# journalctl _SYSTEMD_UNIT=sshd.service
+-- Logs begin at Tue 2018-11-20 17:14:11 CST, end at Tue 2018-11-20 17:50:02 CST. --
+Nov 20 17:15:47 server0.example.com sshd[1078]: Server listening on 0.0.0.0 port 4000.
+Nov 20 17:15:47 server0.example.com sshd[1078]: Server listening on :: port 4000.
+Nov 20 17:15:47 server0.example.com sshd[1078]: Server listening on 0.0.0.0 port 22.
+Nov 20 17:15:47 server0.example.com sshd[1078]: Server listening on :: port 22.
+Nov 20 17:17:28 server0.example.com sshd[1614]: Accepted publickey for root from 172.25.0.250 po
+Nov 20 17:37:59 server0.example.com sshd[1885]: Accepted publickey for root from 172.25.0.250 po
+
+ 
+永久存储系统日志
+默认情况下，systemd日志保存在/run/log/journal中，这意味着系统重启时它会被清除。如果存在/var/log/journal目录，该日志会改为记录在这个目录中，这样启动后就可以利用历史数据。并非所有数据都将永久保留，该日志具有一个内置日志轮转机制，会在每个月触发。日志大小不能超过文件系统的10%，也不能造成文件系统的可用空间低于15%。可以修改/etc/systemd/journald.conf配置文件参数。
+日志大小的当前限制则在systemd-journald进程启动时予以记录。
+[root@server0 rsyslog.d]# journalctl |head -2
+-- Logs begin at Tue 2018-07-31 18:08:55 CST, end at Tue 2018-07-31 21:30:01 CST. --
+Jul 31 18:08:55 localhost systemd-journal[83]: Runtime journal is using 8.0M (max 92.0M, leaving 138.0M of free 912.5M, current limit 92.0M).
+
+journal默认就配好了，将自己的日志保存到/var/log/journal这个目录中，我们要做的，就是创建这个目录，并设置好权限即可
+如果想自定义，可改配置文件：/etc/systemd/journald.conf
+mkdir -m 2755 /var/log/journal
+chown root:systemd-journal /var/log/journal
+systemctl restart systemd-journald.service
+journalctl -b 仅显示系统上一次启动以来的日志信息
+
+保持准确的时间
+时区，过去世界各地自定当地时间，但随着交通和电讯的发达，各地交流日益频繁，所以就需要一个全球性的标准时间，全球划分为24个时区，规定以英国格林威治天文台旧址为0时区（也叫中时区），分东西时区，东12区，以+表示，西12区，以-表示。比如：中国处于东8区，就以UTC+8表示。
+GMT，格林威治时间，现在已经不再作为标准时间使用，是指位于伦敦郊区的皇家格林威治天文台的时间为标准，每个相邻时区之间相差一个小时，但由于地球自转不是一个规则的圆，造成时区间的误差较大。比如：东12区看到日出的时间是6：00，而到了西12区，可能看到日出的时间就是6：15。
+UTC，世界统一时间，还是以格林威治时间为标准，但由原子钟计算每个时区的时间，比GMT时间更精准，误差在0.9秒以内
+CST，只是一个时区的缩写，共代表4个时区，不仅仅代表中国标准时间，要注意。
+central standard time(USA) UT-6:00 美国中部时间
+central standard time (australia) UT+9:30 澳大利亚中部时间
+china standard time UT+8:00 中国标准时间
+cuba standard time UT-4:00  古巴标准时间
+
+设置本地时钟和时区 
+对于在多个系统间分析日志文件而言，正确同步系统时间非常重要，所谓网络时间协议NTP是计算机用于通过互联网提供并获取正确时间信息的一种标准方法。计算机可以通过互联网上的公共NTP服务获取正确的时间信息。
+系统时间：系统启动时，内核会去BIOS取时间，然后自己维护，由linux内核通过CPU的工作频率进行计时。
+硬件时间：指的是BIOS的时间。
+	 
+date命令
+参数：
+%H 小时（以00－23来表示）
+%M 分钟（以00－59来表示）
+%s 	总秒数，以1970-01-01 00:00:00时间算起到目前的秒数
+%S	秒（本地时间的秒）
+%D	日期（包含年月日）
+%Y	年（以四位数来表示）
+%y	年（以后两位数来表示）
+%m	月（以01－12来表示）
+%d	日（以01－31来表示）
+ 
+date查看、设置本地时间
+date	#查看当前系统时间
+date +%F	#显示全部日期
+date +%T	#显示全部时间
+date "+%Y-%m-%d %H:%M:%S"	#以自定义格式输出当前时间。
+date -s	#设置当前时间，只有root权限才能设置，其他只能查看
+date -s 20080523	#将当前日期设置成20080523，这样会把具体时间设置成空00:00:00
+date -s 01:01:01	#设置具体时间，不会对日期作更改
+date -s “01:01:01 2008-05-23”	#设置全部时间
+date -s “01:01:01 20080523” 	#设置全部时间
+date -s “2008-05-23 01:01:01”	#设置全部时间
+date -s “20080523 01:01:01”		#设置全部时间
+ 
+设置硬件时间
+硬件时间: 主板上BIOS中的时间，由主板电池供电来维持运行，系统开机时要读取这个时间，并根据它来设定系统时间，然后系统时钟就会独立于硬件运作（注意：系统启动时根据硬件时间设定系统时间的过程可能存在时区换算，这要视具体的系统及相关设置而定）。
+hwclock -r		#查看硬件时间，也就是主板时间
+hwclock -s 		#从硬件时间设置系统时间
+hwclock -w		#从系统时间设置硬件时间
+ 
+timedatectl命令
+简要显示当前的时间相关系统设置，如系统的当前时间，时区和NTP同步设置。
+timedatectl		#查看当前系统时间的详细信息
+timedatectl set-time “2008-05-23 01:01:01” 设置系统时间，时间以"YYYY-MM-DD hh:mm:ss"格式，可以省略日期或时间
+timedatectl list-timezones 列出已知时区的数据库
+timedatectl set-timezone 设置时区
+tzselect 命令识别省略的zoneinfo时区名称，它以交互式方式向用户提示关于系统位置的问题，然后输出正确的时区名称，不会对系统的时区设置进行任何更改
+timedatectl set-ntp true  启用或禁用NTP同步，true打开，false关闭NTP同步
+ 
+ 
+客户端同步服务器时间
+ntpdate命令：
+当有时间服务器的时候，可以设置本地时间和时间服务同步
+ntpdate 192.168.1.254
+ 
+这种同步时间的方式，只会在执行命令时才会生效，所以需要结合计划任务
+crontab -e
+分 时 日 月 周 command
+ 
+配置和监控chronyd
+chronyd服务通过与配置的NTP服务器同步，使通常不精确的本地硬件时钟RTC保持准确，或者，如果没有可用的网络连接，则与计算的RTC时钟漂移值同步。
+可以在/etc/chrony.conf配置文件中配置两种类别的时间源，分别是server和peer，server比本地NTP服务器高一个级别，而peer则属于同一级别，可以指定多个server和多个peer，每行指定一个。server行的第一参数是NTP服务器的IP地址或DNS名称，在服务器IP地址或名称后，可以列出该服务器的一系列选项，建议使用iburst选项，因为在服务启动后，会在很短时间内执行4种测量，获得更加精确的初始时钟同步。
+编辑配置文件
+/etc/chrony.conf
+	#server，后面指定你的时间服务器地址。iburst，当server不可达时，以默认发包速率的8倍向服务器发包，对首次同步有利，尽快同步
+	#allow，当自身作为时间服务器时，允许哪些地址边过来
+	 
+重启服务
+systemctl restart chronyd.service
+ 
+
+chronyc sources -v
+	#M表示mode，^表示是server，'^' = server, '=' = peer, '#' = local clock.
+	#S表示state，*表示当前同步的NTP时间服务器   Source state '*' = current synced, '+' = combined , '-' = not combined,
+	'?' = unreachable, 'x' = time may be in error, '~' = time too variable.
+	#stratum，表示层级，比如：国家时间服务器为层1，我们自己的服务器连到层1同步时间，并且也对外提供时间服务，那么，我们自己服务器就是层2
+	#poll，轮询时间，以2为基数的幂次方，时间为秒，比如：设置为6，表示每64秒同步一次时间
+	#lastRx，表示最后一次从源收到同步消息，到当前的时间
+	#last sample，表示最后一次收到的时间样本，和本地时间的偏移量。中括号内为偏移量，+/-指示符后面的数字表示测量中的误差范围
+
+查看时间同步源状态：
+# chronyc sourcestats -v
+[root@server0 ~]# chronyc sourcestats -v
+210 Number of sources = 1
+                             .- Number of sample points in measurement set.
+                            /    .- Number of residual runs with same sign.
+                           |    /    .- Length of measurement set (time).
+                           |   |    /      .- Est. clock freq error (ppm).
+                           |   |   |      /           .- Est. error in freq.
+                           |   |   |     |           /         .- Est. offset.
+                           |   |   |     |          |          |   On the -.
+                           |   |   |     |          |          |   samples. \
+                           |   |   |     |          |          |             |
+Name/IP Address            NP  NR  Span  Frequency  Freq Skew  Offset  Std Dev
+==============================================================================
+classroom.example.com       5   3    71     -0.000     61.652     -0ns   377us
+实验：P238
+
+
+syslog服务和logrotate服务
+======================================================================
+rsyslog 是一个 syslogd 的多线程增强版。
+现在Fedora和Ubuntu, rhel6默认的日志系统都是rsyslog了
+rsyslog负责写入日志, logrotate负责备份和删除旧日志, 以及更新日志文件
+———————————————————————-
+rsyslog 服务
+———————————————————————-
+软件包:
+[root@centos ~]# yum install rsyslog rsyslog-mysql  logrotate
+查看当前rsyslog服务的状态:
+[root@centos ~]#/etc/init.d/rsyslog status
+rsyslogd (pid  1343) is running…
+在centos6中, rsyslog服务默认是开机启动的
+我们先看一下它的进程::
+[root@centos ~]# ps -ef | grep rsyslogd | grep -v grep
+root      1343    1  0 12:09 ?        00:00:00 /sbin/rsyslogd -c 4
+从上面命令的输出结果看到rsyslog执行时使用的参数是-c 4.
+它的意思是指定rsyslog运行(兼容)的版本号, 这个参数必须是第一个参数, 当然也可以省略, 默认为-c0, (命令行兼容sysklogd)
+这个参数是在文件/etc/sysconfig/rsyslog中指定::
+[root@centos ~]# cat /etc/sysconfig/rsyslog
+	1. # Options to syslogd
+	2. # syslogd options are deprecated since rsyslog v3
+	3. # if you want to use them, switch to compatibility mode 2 by “-c 2″
+	4. SYSLOGD_OPTIONS=”-c 4″  
+[root@centos ~]# chkconfig –list | grep rsyslog
+rsyslog         0:off   1:off   2:on    3:on    4:on    5:on    6:off
+注意，这里的服务名是rsyslog!
+———————————————————————-
+配置文件
+———————————————————————-
+/etc/rsyslog.conf
+配置文件的基本信息
+配置文件中有很多内容, 但最主要的是指定需要记录哪些服务和需要记录什么等级的信息::
+cat /etc/rsyslog.conf
+	1. #rsyslog v3 config file
+	2. # if you experience problems, check
+	3. # http://www.rsyslog.com/troubleshoot for assistance
+	4. #### MODULES ####    加载 模块
+	5. $ModLoad imuxsock.so  –> 模块名    # provides support for local system logging (e.g. via logger command) 本地系统日志
+	6. $ModLoad imklog.so                    # provides kernel logging support (previously done by rklogd)
+	7. #$ModLoad immark.so              # provides –MARK– message capability
+	8. # Provides UDP syslog reception
+	9. # 允许514端口接收使用UDP协议转发过来的日志
+	10. #$ModLoad imudp.so
+	11. #$UDPServerRun 514
+	12. # Provides TCP syslog reception
+	13. # 允许514端口接收使用TCP协议转发过来的日志
+	14. #$ModLoad imtcp.so
+	15. #$InputTCPServerRun 514
+	16. #### GLOBAL DIRECTIVES ####
+	17. 定义日志格式默认模板  
+	18. # Use default timestamp format
+	19. $ActionFileDefaultTemplate RSYSLOG_TraditionalFileFormat  
+	20. # File syncing capability is disabled by default. This feature is usually not required,
+	21. # not useful and an extreme performance hit
+	22. #$ActionFileEnableSync on
+	23. #### RULES ####
+	24. # Log all kernel messages to the console.
+	25. # Logging much else clutters up the screen.
+	26. #kern.*                                                 /dev/console    关于内核的所有日志都放到/dev/console(控制台)
+	27. # Log anything (except mail) of level info or higher.
+	28. # Don’t log private authentication messages!
+	29. # 记录所有日志类型的info级别以及大于info级别的信息到/var/log/messages，但是mail邮件信息，authpriv验证方面的信息和cron时间任务相关的信息除外
+	30. *.info;mail.none;authpriv.none;cron.none                /var/log/messages  
+	31. # The authpriv file has restricted access.
+	32. # authpriv验证相关的所有信息存放在/var/log/secure
+	33. authpriv.*                                              /var/log/secure  
+	34. # Log all the mail messages in one place.
+	35. # 邮件的所有信息存放在/var/log/maillog; 这里有一个-符号, 表示是使用异步的方式记录, 因为日志一般会比较大
+	36. mail.*                                                  -/var/log/maillog  
+	37. # Log cron stuff
+	38. # 计划任务有关的信息存放在/var/log/cron
+	39. cron.*                                                  /var/log/cron  
+	40. # Everybody gets emergency messages
+	41. # 记录所有的大于等于emerg级别信息, 以wall方式发送给每个登录到系统的人
+	42. *.emerg                                                 *                  *代表所有在线用户  
+	43. # Save news errors of level crit and higher in a special file.
+	44. # 记录uucp,news.crit等存放在/var/log/spooler
+	45. uucp,news.crit                                          /var/log/spooler  
+	46. # Save boot messages also to boot.log     启动的相关信息
+	47. local7.*                                                /var/log/boot.log
+	48. #:rawmsg, contains, “sdns_log” @@192.168.56.7:10514
+	49. #:rawmsg, contains, “sdns_log” ~
+	50. # ### begin forwarding rule ###  转发规则
+	51. # The statement between the begin … end define a SINGLE forwarding
+	52. # rule. They belong together, do NOT split them. If you create multiple
+	53. # forwarding rules, duplicate the whole block!
+	54. # Remote Logging (we use TCP for reliable delivery)
+	55. #
+	56. # An on-disk queue is created for this action. If the remote host is
+	57. # down, messages are spooled to disk and sent when it is up again.
+	58. #$WorkDirectory /var/spppl/rsyslog # where to place spool files
+	59. #$ActionQueueFileName fwdRule1 # unique name prefix for spool files
+	60. #$ActionQueueMaxDiskSpace 1g   # 1gb space limit (use as much as possible)
+	61. #$ActionQueueSaveOnShutdown on # save messages to disk on shutdown
+	62. #$ActionQueueType LinkedList   # run asynchronously
+	63. #$ActionResumeRetryCount -1    # infinite retries if host is down
+	64. # remote host is: name/ip:port, e.g. 192.168.0.1:514, port optional
+	65. #*.* @@remote-host:514                    # @@表示通过tcp协议发送    @表示通过udp进行转发
+	66. #local3.info  @@localhost :514
+	67. #local7.*                                    #            @@192.168.56.7:514
+	68. # ### end of the forwarding rule ###
+格式::
+日志设备(类型).(连接符号)日志级别   日志处理方式(action)
+日志设备(可以理解为日志类型):
+———————————————————————-
+auth        –pam产生的日志
+authpriv    –ssh,ftp等登录信息的验证信息
+cron        –时间任务相关
+kern        –内核
+lpr         –打印
+mail        –邮件
+mark(syslog)–rsyslog服务内部的信息,时间标识
+news        –新闻组
+user        –用户程序产生的相关信息
+uucp        –unix to unix copy, unix主机之间相关的通讯
+local 1~7   –自定义的日志设备
+日志级别:
+———————————————————————-
+debug       –有调式信息的，日志信息最多
+info        –一般信息的日志，最常用
+notice      –最具有重要性的普通条件的信息
+warning     –警告级别
+err         –错误级别，阻止某个功能或者模块不能正常工作的信息
+crit        –严重级别，阻止整个系统或者整个软件不能正常工作的信息
+alert       –需要立刻修改的信息
+emerg       –内核崩溃等严重信息
+none        –什么都不记录
+从上到下，级别从低到高，记录的信息越来越少
+详细的可以查看手册: man 3 syslog
+连接符号
+———————————————————————-
+.xxx: 表示大于等于xxx级别的信息
+.=xxx：表示等于xxx级别的信息
+.!xxx：表示在xxx之外的等级的信息
+Actions
+———————————————————————-
+1. 记录到普通文件或设备文件::
+*.*     /var/log/file.log   # 绝对路径
+*.*     /dev/pts/0
+测试: logger -p local3.info ‘KadeFor is testing the rsyslog and logger ‘   logger 命令用于产生日志
+2. 转发到远程::
+*.* @192.168.0.1            # 使用UDP协议转发到192.168.0.1的514(默认)端口
+*.* @@192.168.0.1:10514     # 使用TCP协议转发到192.168.0.1的10514(默认)端口
+3. 发送给用户(需要在线才能收到)::
+*.*   root
+*.*   root,kadefor,up01     # 使用,号分隔多个用户
+*.*   *     # *号表示所有在线用户
+4. 忽略,丢弃::
+local3.*   ~    # 忽略所有local3类型的所有级别的日志
+5. 执行脚本::
+local3.*    ^/tmp/a.sh      # ^号后跟可执行脚本或程序的绝对路径
+# 日志内容可以作为脚本的第一个参数.
+# 可用来触发报警
+.. note::
+日志记录的顺序有先后关系!
+======================================================================
+一个标准的简单的配置文件
+======================================================================
+::
+*.info;mail.none;authpriv.none;cron.none      /var/log/messages
+authpriv.*                                    /var/log/secure
+mail.*                                        /var/log/maillog
+cron.*                                        /var/log/cron
+*.emerg                                       *
+uucp,news.crit                                /var/log/spooler
+local7.*                                      /var/log/boot.log
+======================================================================
+实例: 指定日志文件, 或者终端
+======================================================================
+[root@kadefor ule-sa3]# vi /etc/rsyslog.conf
+[root@kadefor ule-sa3]# grep local3 !$
+grep local3 /etc/rsyslog.conf
+local3.*                                                /var/log/local3.log
+[root@kadefor ule-sa3]# rm -rf /var/log/local3.log
+[root@kadefor ule-sa3]# /etc/init.d/rsyslog reload
+Reloading system logger…                                 [  OK  ]
+[root@kadefor ule-sa3]# ls /var/log/local3.log
+/var/log/local3.log
+[root@kadefor ule-sa3]# logger -t ‘LogTest’ -p local3.info ‘KadeFor is testing the rsyslog and logger’
+[root@kadefor ule-sa3]# cat /var/log/local3.log
+Jun 10 04:55:52 kadefor LogTest: KadeFor is testing the rsyslog and logger
+[root@kadefor ule-sa3]#
+自己实验日志发送给某个终端
+======================================================================
+实例:  过滤特定的日志到文件, 忽略(丢弃)包含某个字符串的日志
+======================================================================
+# 过滤日志, 由:号开头
+:msg, contains, “error” /var/log/error.log
+:msg, contains, “error” ~         # 忽略包含error的日志
+:msg, contains, “user nagios”   ~
+:msg, contains, “user kadefor”   ~
+:msg, contains, “module-alsa-sink.c: ALSA woke us up to write new data to the device, but there was actually nothing to write” ~
+local3.*    ~
+PS.
+&   ~       # 忽略所有的日志
+把包含’oracle’的日志保存在/var/log/oracle.log
+======================================================================
+实例:  使用模板来定义日志格式
+======================================================================
+定义默认的日志格式:
+	1. $template myFormat,”%rawmsg%\n”  
+	2. $ActionFileDefaultTemplate myFormat  
+	3. #如果不要$ActionFileDefaultTemplate myFormat这一行, 就需要像这样来使用模板:
+	4. #在日志文件后添加模板名, 并用;号分隔
+	5. $template myFormat,”%rawmsg%\n”  
+	6. # The authpriv file has restricted access.
+	7. authpriv.*      /var/log/secure;myFormat  
+	8. # Log all the mail messages in one place.
+	9. mail.*          /var/log/maillog;myFormat  
+	10. # Log cron stuff
+	11. cron.*          /var/log/cron;myFormat  
+	12. # Everybody gets emergency messages
+	13. *.emerg                                       *  
+	14. # Save news errors of level crit and higher in a special file.
+	15. uucp,news.crit  /var/log/spooler;myFormat  
+	16. # Save boot messages also to boot.log
+	17. local7.*        /var/log/boot.log;myFormat  
+======================================================================
+实例: remote log 远程发送与接收:
+======================================================================
+如果要修改为非514的端口, 需要设置selinux
+只要在rsyslog.conf中加入
+*.* @192.168.0.10
+*.* @192.168.0.10:10514     # 带端口号
+*.* @@192.168.0.10      # TCP
+但是没有定义保存在远程的哪一个文件啊?
+其实保存在什么文件, 那是远程日志服务器接收到日志之后它自己的事情了.
+例1:
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+———————————————————————-
+Client(send):
+———————————————————————-
+::
+local3.*   @@192.0.2.1:10514
+# if you need to forward to other systems as well, just
+# add additional config lines:
+# *.*   @@other-server.example.net:10514
+# Log anything (except mail) of level info or higher.
+# Don’t log private authentication messages!
+*.info;mail.none;authpriv.none;cron.none      /var/log/messages
+# The authpriv file has restricted access.
+authpriv.*                                    /var/log/secure
+# Log all the mail messages in one place.
+mail.*                                        /var/log/maillog
+# Log cron stuff
+cron.*                                        /var/log/cron
+# Everybody gets emergency messages
+*.emerg                                       *
+# Save news errors of level crit and higher in a special file.
+uucp,news.crit                                /var/log/spooler
+# Save boot messages also to boot.log
+local7.*                                      /var/log/boot.log
+———————————————————————-
+Server(receive): <1>
+———————————————————————-
+::
+# for TCP use:
+$modload imtcp
+$InputTCPServerRun 10514
+# for UDP use:
+$modload imudp
+$UDPServerRun 514
+# Log anything (except mail) of level info or higher.
+# Don’t log private authentication messages!
+*.info;mail.none;authpriv.none;cron.none      /var/log/messages
+# The authpriv file has restricted access.
+authpriv.*                                    /var/log/secure
+# Log all the mail messages in one place.
+mail.*                                        /var/log/maillog
+# Log cron stuff
+cron.*                                        /var/log/cron
+# Everybody gets emergency messages
+*.emerg                                       *
+# Save news errors of level crit and higher in a special file.
+uucp,news.crit                                /var/log/spooler
+# Save boot messages also to boot.log
+local7.*                                      /var/log/boot.log
+local3.*    /var/log/local3.log     # 测试用
+例2 (仅做了解, 不做要求)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#配置服务端(接收)
+———————————————————————-
+vi /etc/rsyslog.conf        #在文件开始加上，同时确保514端口能够被客户端用tcp访问
+$ModLoad imtcp.so              # needs to be done just once #使用tcp方式
+$InputTCPMaxSessions 500    # tcp接收连接数为500个
+$InputTCPServerRun 514      # tcp接收信息的端口
+$template logformat,”%TIMESTAMP:::date-mysql% %FROMHOST-IP%%msg%\n”     # 定义一个名为logformat模板, 为信息加上日志时间
+$template DynFile,”/var/log/tlog%$year%%$month%%$day%.log”     # 定义日志文件的名称，按照年月日
+:rawmsg, contains, “sdns_log” ?DynFile;logformat    # 把rawmsg(也可以使用msg)日志中包含sdns_log标志的信息写到DynFile定义的日志文件里
+:rawmsg, contains, “sdns_log”  ~                     # 这个表示丢弃包含sdns_log标志的信息, 一般都加上它, 以免多个日志文件记录重复的日志
+#配置客户端(发送)
+———————————————————————-
+vi /etc/rsyslog.conf  #在文件开始加上
+#把包含sdns_log的信息通过tcp发到192.168.1.2 @@表示tcp @表示udp
+:rawmsg, contains, “sdns_log”       @@192.168.1.2       # 默认514端口
+#这个表示丢弃包含sdns_log标志的信息,防止这个信息写到本机的/var/log/message
+:rawmsg, contains, “sdns_log”       ~
+#测试
+———————————————————————-
+在客户端上执行
+logger -p user.info “sdns_log 34334″
+在服务端的/var/log/目录里是否有tlog*日志产生
+补充:
+———————————————————————-
+如果要把不同服务器发送过来的日志保存到不同的文件, 可以这样操作:
+:fromhost-ip, isequal, “192.168.0.160″ /var/log/host160.log
+:FROMHOST-IP, isequal, “192.168.0.161″ /var/log/host161.log
+:FROMHOST-IP, startswith, “192.168.1.” /var/log/network1.log
+:FROMHOST-IP, startswith, “192.168.2.” /var/log/network2.log
+练习:
+======================================================================
+1. 实现把ssh服务的日志自定义保存到/var/log/newsshd.log (先不做)
+2. mail日志保存在远程日志服务器/var/log/newmail.log
+3. 过滤日志, 如果日志包含有”daydayup”, 则执行脚本/tmp/a.sh
+脚本内容:
+#!/bin/bash
+echo  “KO::** $1″ > /dev/tty2
+======================================================================
+logrotate服务
+======================================================================
+rotate 轮换,日志切换
+logrotate服务的启动方式
+logrotate是一个日志管理程序，用来把旧的日志文件删除（备份），并创建新的日志文件，这个过程称为“转储”。我们可以根据日志的大小，或者根据其使用的天数来转储。
+logrotate 的执行由crond服务实现。在/etc/cron.daily目录中，有个文件logrotate，它实际上是个shell script，用来启动logrotate。logrotate程序每天由cron在指定的时间（/etc/crontab）启动。
+因此，使用ps是无法查看到logrotate的。如果它没有起来，就要查看一下crond服务有没有在运行。
+在执行logrotate时，需要指定其配置文件/etc/logrotate.conf
+这 个配置文件的注释写得很清楚，没有必要再罗嗦了。只想强调下面这行，它的作用包含存放在/etc/logrotate.d目录下面的配置文件，不可或缺。 如果你安装了一个新的服务，它的日志转储的规则可以建立一个专门的配置文件，放在/etc/logrotate.d下面。它其实也因为下面的这句话，在 logrotate服务启动时被读取。
+每个存放在/etc/logrotate.d目录里的文件，都有上面格式的配置信息。在{}中定义的规则，如果与logrotate.conf中的冲突，以/etc/logrotatate.d/中的文件定义的为准。
+logrotate启动脚本放在 /etc/cron.daily/logrotate 中，可人工执行命令进行测试：
+/usr/sbin/logrotate -f /etc/logrotate.conf
+dateext表示转储文件会以日期来结束*
+::
+[root@kadefor log]# vim /etc/logrotate.conf
+# see “man logrotate” for details
+# rotate log files weekly
+weekly          –每周轮转一次
+# keep 4 weeks worth of backlogs
+rotate 4        –保留四个
+# create new (empty) log files after rotating old ones
+create          –rotate后，创建一个新的空文件
+# uncomment this if you want your log files compressed
+#compress       –默认是不压缩的
+# RPM packages drop log rotation information into this directory
+include /etc/logrotate.d        –这个目录下面配置文件生效
+# no packages own wtmp — we’ll rotate them here
+/var/log/wtmp {             –定义/var/log/wtmp这个日志文件
+monthly                 –每月轮转一次，取代了上面的全局设定的每周轮转一次
+minsize 1M              –定义日志必须要大于1M大小才会去轮转
+create 0664 root utmp   –新的日志文件的权限，属主，属主
+rotate 1                –保留一个，取代了上面的全局设定的保留四个
+}
+/var/log/btmp {
+missingok       –如果日志丢失, 不报错
+monthly
+create 0600 root utmp
+rotate 1
+}
+::
+# sample logrotate configuration file
+compress
+# 全局设置, 压缩
+/var/log/messages {
+rotate 5     # 保留5份日志
+weekly       # 每周轮换一次
+postrotate   # 轮换之后重启syslogd服务
+/usr/bin/killall -HUP syslogd
+# rhel6中为:/bin/kill -HUP `cat /var/run/syslogd.pid 2> /dev/null` 2> /dev/null || true
+# 可查看/etc/logrotate.d/下的配置文件
+endscript
+}
+“/var/log/httpd/access.log” /var/log/httpd/error.log {   #  指定多个文件, 如果有特殊字符需要用单引号
+rotate 5
+mail www@my.org
+size 100k        # 超过100k后切换日志, 并把老的日志发送邮件给www@my.org
+sharedscripts    # 共享脚本. 下面的postrotate脚本只运行一次.
+postrotate
+/usr/bin/killall -HUP httpd
+endscript
+}
+/var/log/news/* {    # 少用通配符, 因会它会包括已经切换过的日志, 要用的话最好在*号后加上扩展名, 如*.log
+monthly
+rotate 2
+olddir /var/log/news/old
+missingok
+postrotate
+kill -HUP ‘cat /var/run/inn.pid‘
+endscript
+nocompress
+}
+例：
+修改/etc/logrotate.conf
+/var/log/wtmp {
+monthly
+minsize 10k
+create 0664 a b
+rotate 2
+}
+logrotate -f /etc/logrotate.conf  –强制轮转
+logrotate -vf /etc/logrotate.conf    –再加一个-v参数查看轮转的过程
+———————————
+[root@kadefor log]# vim /etc/logrotate.d/syslog
+/var/log/messages /var/log/secure /var/log/maillog /var/log/spooler /var/log/boot.log /var/log/cron {
+sharedscripts   –表示切换时脚本只执行一次
+postrotate      –表示rotate后执行的脚本
+/bin/kill -HUP `cat /var/run/syslogd.pid 2> /dev/null` 2> /dev/null || true
+/bin/kill -HUP `cat /var/run/rsyslogd.pid 2> /dev/null` 2> /dev/null || true
+endscript       –表示脚本结束
+}
+[root@kadefor log]# logger -t ‘aaaa’ ‘bbbbbb’–在日志里加一个内容tag和内容
+[root@kadefor log]# tail /var/log/messages
+Jun 12 19:38:55 kadefor dhclient[3166]: bound to 192.168.1.101 — renewal in 3384 seconds.
+Jun 12 20:34:22 kadefor aaaa: bbbbbb
+一、/var目录
+/var 所有服务的登录的文件或错误信息文件（LOG FILES)都在/var/log下，此外，一些数据库如MySQL则在/var/lib下，还有，用户未读的邮件的默认存放地点为/var/spool/mail
+二、:/var/log/
+系统的引导日志:/var/log/boot.log
+例如:Feb 26 10:40:48 sendmial : sendmail startup succeeded
+就是邮件服务启动成功!
+
+系统日志一般都存在/var/log下
+常用的系统日志如下:
+核心启动日志:/var/log/dmesg
+系统报错日志:/var/log/messages
+邮件系统日志:/var/log/maillog
+FTP系统日志:/var/log/xferlog
+安全信息和系统登录与网络连接的信息:/var/log/secure
+登录记录:/var/log/wtmp      记录登录者讯录，二进制文件，须用last来读取内容    who -u /var/log/wtmp 查看信息
+News日志:/var/log/spooler
+RPM软件包:/var/log/rpmpkgs
+XFree86日志:/var/log/XFree86.0.log
+引导日志:/var/log/boot.log   记录开机启动讯息，dmesg | more
+cron(定制任务日志)日志:/var/log/cron
+ 
+安全信息和系统登录与网络连接的信息:/var/log/secure
+ 
+文件 /var/run/utmp 記錄著現在登入的用戶。
+文件 /var/log/wtmp 記錄所有的登入和登出。
+文件 /var/log/lastlog 記錄每個用戶最後的登入信息。
+文件 /var/log/btmp 記錄錯誤的登入嘗試。
+ 
+
+less /var/log/auth.log 需要身份确认的操作
+三、部分命令详解
+ 
+   /var/log/messages
+ 
+    messages 日志是核心系统日志文件。它包含了系统启动时的引导消息，以及系统运行时的其他状态消息。IO 错误、网络错误和其他系统错误都会记录到这个文件中。其他信息，比如某个人的身份切换为 root，也在这里列出。如果服务正在运行，比如 DHCP 服务器，您可以在 messages 文件中观察它的活动。通常，/var/log/messages 是您在做故障诊断时首先要查看的文件。
+   /var/log/XFree86.0.log
+这个日志记录的是 Xfree86 Xwindows 服务器最后一次执行的结果。如果您在启动到图形模式时遇到了问题，一般情况从这个文件中会找到失败的原因。
+  http://www.guanwei.org/post/LINUXnotes/01/linuxlogs.html
+ 
+     成 功地管理任何系统的关键之一，是要知道系统中正在发生什么事。Linux 中提供了异常日志，并且日志的细节是可配置的。Linux 日志都以明文形式存储，所以用户不需要特殊的工具就可以搜索和阅读它们。还可以编写脚本，来扫描这些日志，并基于它们的内容去自动执行某些功能。 Linux 日志存储在 /var/log 目录中。这里有几个由系统维护的日志文件，但其他服务和程序也可能会把它们的日志放在这里。大多数日志只有root账户才可以读，不过修改文件的访问权限 就可以让其他人可读。
+日志文件分类
+/var/log/boot.log
+该文件记录了系统在引导过程中发生的事件，就是Linux系统开机自检过程显示的信息。
+/var/log/cron
+该 日志文件记录crontab守护进程crond所派生的子进程的动作，前面加上用 户、登录时间和PID，以及派生出的进程的动作。CMD的一个动作是cron派生出一个调度进程的常见情况。REPLACE（替换）动作记录用户对它的 cron文件的更新，该文件列出了要周期性执行的任务调度。 RELOAD动作在REPLACE动作后不久发生，这意味着cron注意到一个用户的cron文件被更新而cron需要把它重新装入内存。该文件可能会查 到一些反常的情况。
+/var/log/maillog
+该日志文件记录了每一个发送到系统或从系统发出的电子邮件的活动。它可以用来查看用户使用哪个系统发送工具或把数据发送到哪个系统。下面是该日志文件的片段：
+Sep 4 17:23:52 UNIX sendmail[1950]: g849Npp01950: from=root, size=25,
+class=0, nrcpts=1,
+msgid=<200209040923.g849Npp01950@redhat.pfcc.com.cn>,
+relay=root@localhost
+Sep 4 17:23:55 UNIX sendmail[1950]: g849Npp01950: to=lzy@fcceec.net,
+ctladdr=root (0/0), delay=00:00:04, xdelay=00:00:03, mailer=esmtp, pri=30025,
+relay=fcceec.net. [10.152.8.2], dsn=2.0.0, stat=Sent (Message queued)
+/var/log/messages
+ 
+该日志文件是许多进程日志文件的汇总，从该文件可以看出任何入侵企图或成功的入侵。如以下几行：
+Sep 3 08:30:17 UNIX login[1275]: FAILED LOGIN 2 FROM (null) FOR suying,
+Authentication failure
+Sep 4 17:40:28 UNIX -- suying[2017]: LOGIN ON pts/1 BY suying FROM
+fcceec.www.ec8.pfcc.com.cn
+Sep 4 17:40:39 UNIX su(pam_unix)[2048]: session opened for user root by suying(uid=999)
+   该 文件的格式是每一行包含日期、主机名、程序名，后面是包含PID或内核标识的方括 号、一个冒号和一个空格，最后是消息。该文件有一个不足，就是被记录的入侵企图和成功的入侵事件，被淹没在大量的正常进程的记录中。但该文件可以由 /etc/syslog文件进行定制。由 /etc/syslog.conf配置文件决定系统如何写入/var/messages。有关如何配置/etc/syslog.conf文件决定系统日志 记录的行为，将在后面详细叙述。
+/var/log/syslog
+默 认RedHat Linux不生成该日志文件，但可以配置/etc/syslog.conf让系统生成该日志文件。它和/etc/log/messages日志文件不同， 它只记录警告信息，常常是系统出问题的信息，所以更应该关注该文件。要让系统生成该日志文件，在/etc/syslog.conf文件中加上： *.warning /var/log/syslog 该日志文件能记录当用户登录时login记录下的错误口令、Sendmail的问题、su命令执行失败等信息。下面是一条记录：
+ 
+Sep 6 16:47:52 UNIX login(pam_unix)[2384]: check pass; user unknown
+/var/log/secure
+该日志文件记录与安全相关的信息。该日志文件的部分内容如下：
+Sep 4 16:05:09 UNIX xinetd[711]: START: ftp pid=1815 from=127.0.0.1
+Sep 4 16:05:09 UNIX xinetd[1815]: USERID: ftp OTHER :root
+Sep 4 16:07:24 UNIX xinetd[711]: EXIT: ftp pid=1815 duration=135(sec)
+Sep 4 16:10:05 UNIX xinetd[711]: START: ftp pid=1846 from=127.0.0.1
+Sep 4 16:10:05 UNIX xinetd[1846]: USERID: ftp OTHER :root
+Sep 4 16:16:26 UNIX xinetd[711]: EXIT: ftp pid=1846 duration=381(sec)
+Sep 4 17:40:20 UNIX xinetd[711]: START: telnet pid=2016 from=10.152.8.2
+ 
+/var/log/lastlog
+   该 日志文件记录最近成功登录的事件和最后一次不成功的登录事件，由login生成。 在每次用户登录时被查询，该文件是二进制文件，需要使用 lastlog命令查看，根据UID排序显示登录名、端口号和上次登录时间。如果某用户从来没有登录过，就显示为"**Never logged in**"。该命令只能以root权限执行。简单地输入lastlog命令后就会看到类似如下的信息：
+Username Port From Latest
+root tty2 Tue Sep 3 08:32:27 +0800 2002
+bin **Never logged in**
+daemon **Never logged in**
+adm **Never logged in**
+lp **Never logged in**
+sync **Never logged in**
+shutdown **Never logged in**
+halt **Never logged in**
+mail **Never logged in**
+news **Never logged in**
+uucp **Never logged in**
+operator **Never logged in**
+games **Never logged in**
+gopher **Never logged in**
+ftp ftp UNIX Tue Sep 3 14:49:04 +0800 2002
+nobody **Never logged in**
+nscd **Never logged in**
+mailnull **Never logged in**
+ident **Never logged in**
+rpc **Never logged in**
+rpcuser **Never logged in**
+xfs **Never logged in**
+gdm **Never logged in**
+postgres **Never logged in**
+apache **Never logged in**
+lzy tty2 Mon Jul 15 08:50:37 +0800 2002
+suying tty2 Tue Sep 3 08:31:17 +0800 2002
+ 
+   系统账户诸如bin、daemon、adm、uucp、mail等决不应该登录，如果发现这些账户已经登录，就说明系统可能已经被入侵了。若发现记录的时间不是用户上次登录的时间，则说明该用户的账户已经泄密了。
+ 
+/var/log/wtmp
+   该 日志文件永久记录每个用户登录、注销及系统的启动、停机的事件。因此随着系统正常 运行时间的增加，该文件的大小也会越来越大，增加的速度取决于系统用户登录的次数。该日志文件可以用来查看用户的登录记录，last命令就通过访问这个文 件获得这些信息，并以反序从后向前显示用户的登录记录，last也能根据用户、终端 tty或时间显示相应的记录。
+ 
+命令last有两个可选参数：
+last -u 用户名 显示用户上次登录的情况。
+last -t 天数 显示指定天数之前的用户登录情况。
+ 
+/var/run/utmp
+   该 日志文件记录有关当前登录的每个用户的信息。因此这个文件会随着用户登录和注销系 统而不断变化，它只保留当时联机的用户记录，不会为用户保留永久的记录。系统中需要查询当前用户状态的程序，如 who、w、users、finger等就需要访问这个文件。该日志文件并不能包括所有精确的信息，因为某些突发错误会终止用户登录会话，而系统没有及时 更新 utmp记录，因此该日志文件的记录不是百分之百值得信赖的。
+ 
+以 上提及的3个文件（/var/log/wtmp、/var/run/utmp、 /var/log/lastlog）是日志子系统的关键文件，都记录了用户登录的情况。这些文件的所有记录都包含了时间戳。这些文件是按二进制保存的，故 不能用less、cat之类的命令直接查看这些文件，而是需要使用相关命令通过这些文件而查看。其中，utmp和wtmp文件的数据结构是一样的，而 lastlog文件则使用另外的数据结构，关于它们的具体的数据结构可以使用man命令查询。
+ 
+每 次有一个用户登录时，login程序在文件lastlog中查看用户的UID。如果存在，则把用户上次登录、注销时间和主机名写到标准输出中，然后 login程序在lastlog中记录新的登录时间，打开utmp文件并插入用户的utmp记录。该记录一直用到用户登录退出时删除。utmp文件被各种 命令使用，包括who、w、users和finger。
+ 
+下一步，login程序打开文件wtmp附加用户的utmp记录。当用户登录退出时，具有更新时间戳的同一utmp记录附加到文件中。wtmp文件被程序last使用。
+ 
+/var/log/xferlog
+   该日志文件记录FTP会话，可以显示出用户向FTP服务器或从服务器拷贝了什么文件。该文件会显示用户拷贝到服务器上的用来入侵服务器的恶意程序，以及该用户拷贝了哪些文件供他使用。
+ 
+   该 文件的格式为：第一个域是日期和时间，第二个域是下载文件所花费的秒数、远程系统 名称、文件大小、本地路径名、传输类型（a：ASCII，b：二进制）、与压缩相关的标志或tar，或"_"（如果没有压缩的话）、传输方向（相对于服务 器而言：i代表进，o代表出）、访问模式（a：匿名，g：输入口令，r：真实用户）、用户名、服务名（通常是ftp）、认证方法（l：RFC931，或 0），认证用户的ID或"*"。下面是该文件的一条记录：
+ 
+Wed Sep 4 08:14:03 2002 1 UNIX 275531
+/var/ftp/lib/libnss_files-2.2.2.so b _ o a -root@UNIX ftp 0 * c
+/var/log/kernlog
+ 
+ 
+RedHat Linux默认没有记录该日志文件。要启用该日志文件，必须在/etc/syslog.conf文件中添加一行：kern.* /var/log/kernlog 。这样就启用了向/var/log/kernlog文件中记录所有内核消息的功能。该文件记录了系统启动时加载设备或使用设备的情况。一般是正常的操作， 但如果记录了没有授权的用户进行的这些操作，就要注意，因为有可能这就是恶意用户的行为。下面是该文件的部分内容：
+ 
+Sep 5 09:38:42 UNIX kernel: NET4: Linux TCP/IP 1.0 for NET4.0
+Sep 5 09:38:42 UNIX kernel: IP Protocols: ICMP, UDP, TCP, IGMP
+Sep 5 09:38:42 UNIX kernel: IP: routing cache hash table of 512 buckets, 4Kbytes
+Sep 5 09:38:43 UNIX kernel: TCP: Hash tables configured (established 4096 bind 4096)
+Sep 5 09:38:43 UNIX kernel: Linux IP multicast router 0.06 plus PIM-SM
+Sep 5 09:38:43 UNIX kernel: NET4: Unix domain sockets 1.0/SMP for Linux NET4.0.
+Sep 5 09:38:44 UNIX kernel: EXT2-fs warning: checktime reached, running e2fsck is recommended
+Sep 5 09:38:44 UNIX kernel: VFS: Mounted root (ext2 filesystem).
+Sep 5 09:38:44 UNIX kernel: SCSI subsystem driver Revision: 1.00
+/var/log/Xfree86.x.log
+ 
+ 
+ 
+该 日志文件记录了X-Window启动的情况。另外，除了/var/log/外，恶 意用户也可能在别的地方留下痕迹，应该注意以下几个地方：root 和其他账户的shell历史文件；用户的各种邮箱，如.sent、mbox，以及存放在/var/spool/mail/ 和 /var/spool/mqueue中的邮箱；临时文件/tmp、/usr/tmp、/var/tmp；隐藏的目录；其他恶意用户创建的文件，通常是以 "."开头的具有隐藏属性的文件等。
+ 
+四、具体命令
+ 
+   wtmp和utmp文件都是二进制文件，它们不能被诸如tail之类的命令剪贴或合并（使用cat命令）。用户需要使用who、w、users、last和ac等命令来使用这两个文件包含的信息。
+ 
+who命令
+ 
+who命令查询utmp文件并报告当前登录的每个用户。who的默认输出包括用户名、终端类型、登录日期及远程主机。例如，键入who命令，然后按回车键，将显示如下内容：
+chyang pts/0 Aug 18 15:06
+ynguo pts/2 Aug 18 15:32
+ynguo pts/3 Aug 18 13:55
+lewis pts/4 Aug 18 13:35
+ynguo pts/7 Aug 18 14:12
+ylou pts/8 Aug 18 14:15
+ 
+如果指明了wtmp文件名，则who命令查询所有以前的记录。命令who /var/log/wtmp将报告自从wtmp文件创建或删改以来的每一次登录。
+ 
+w命令
+ 
+w命令查询utmp文件并显示当前系统中每个用户和它所运行的进程信息。例如，键入w命令，然后按回车键，将显示如下内容：
+ 
+ 
+3:36pm up 1 day, 22:34, 6 users, load average: 0.23, 0.29, 0.27
+USER TTY FROM LOGIN@ IDLE JCPU PCPU WHAT
+chyang pts/0 202.38.68.242 3:06pm 2:04 0.08s 0.04s -bash
+ynguo pts/2 202.38.79.47 3:32pm 0.00s 0.14s 0.05 w
+lewis pts/3 202.38.64.233 1:55pm 30:39 0.27s 0.22s -bash
+lewis pts/4 202.38.64.233 1:35pm 6.00s 4.03s 0.01s sh /home/users/
+ynguo pts/7 simba.nic.ustc.e 2:12pm 0.00s 0.47s 0.24s telnet mail
+ylou pts/8 202.38.64.235 2:15pm 1:09m 0.10s 0.04s -bash
+users命令
+ 
+users命令用单独的一行打印出当前登录的用户，每个显示的用户名对应一个登录会话。如果一个用户有不止一个登录会话，那他的用户名将显示相同的次数。例如，键入users命令，然后按回车键，将显示如下内容：
+chyang lewis lewis ylou ynguo ynguo
+last命令
+ 
+last命令往回搜索wtmp来显示自从文件第一次创建以来登录过的用户。例如：
+ 
+chyang pts/9 202.38.68.242 Tue Aug 1 08:34 - 11:23 (02:49)
+cfan pts/6 202.38.64.224 Tue Aug 1 08:33 - 08:48 (00:14)
+chyang pts/4 202.38.68.242 Tue Aug 1 08:32 - 12:13 (03:40)
+lewis pts/3 202.38.64.233 Tue Aug 1 08:06 - 11:09 (03:03)
+lewis pts/2 202.38.64.233 Tue Aug 1 07:56 - 11:09 (03:12)
+ 
+如果指明了用户，那么last只报告该用户的近期活动，例如，键入last ynguo命令，然后按回车键，将显示如下内容：
+ 
+ynguo pts/4 simba.nic.ustc.e Fri Aug 4 16:50 - 08:20 (15:30)
+ynguo pts/4 simba.nic.ustc.e Thu Aug 3 23:55 - 04:40 (04:44)
+ynguo pts/11 simba.nic.ustc.e Thu Aug 3 20:45 - 22:02 (01:16)
+ynguo pts/0 simba.nic.ustc.e Thu Aug 3 03:17 - 05:42 (02:25)
+ynguo pts/0 simba.nic.ustc.e Wed Aug 2 01:04 - 03:16 1+02:12)
+ynguo pts/0 simba.nic.ustc.e Wed Aug 2 00:43 - 00:54 (00:11)
+ynguo pts/9 simba.nic.ustc.e Thu Aug 1 20:30 - 21:26 (00:55)
+ 
+ac命令
+ 
+ac命令根据当前的/var/log/wtmp文件中的登录进入和退出来报告用户连接的时间（小时），如果不使用标志，则报告总的时间。例如，键入ac命令，然后按回车键，将显示如下内容：
+total 5177.47
+键入ac -d命令，然后按回车键，将显示每天的总的连接时间：
+ 
+Aug 12 total 261.87
+Aug 13 total 351.39
+Aug 14 total 396.09
+Aug 15 total 462.63
+Aug 16 total 270.45
+Aug 17 total 104.29
+Today total 179.02
+ 
+键入ac -p命令，然后按回车键，将显示每个用户的总的连接时间：
+ 
+ynguo 193.23
+yucao 3.35
+rong 133.40
+hdai 10.52
+zjzhu 52.87
+zqzhou 13.14
+liangliu 24.34
+total 5178.24
+ 
+lastlog命令
+ 
+lastlog 文件在每次有用户登录时被查询。可以使用lastlog命令检查某特 定用户上次登录的时间，并格式化输出上次登录日志 /var/log/lastlog的内容。它根据UID排序显示登录名、端口号（tty）和上次登录时间。如果一个用户从未登录过，lastlog显示 **Never logged**。注意需要以root身份运行该命令，例如：
+ 
+rong 5 202.38.64.187 Fri Aug 18 15:57:01 +0800 2000
+dbb **Never logged in**
+xinchen **Never logged in**
+pb9511 **Never logged in**
+xchen 0 202.38.64.190 Sun Aug 13 10:01:22 +0800 2000
+ 
+另外，可加一些参数，例如，"last -u 102"命令将报告UID为102的用户；"last -t 7"命令表示限制为上一周的报告。
+ 
+五、进程统计
+ 
+   UNIX 可以跟踪每个用户运行的每条命令，如果想知道昨晚弄乱了哪些重要的文件，进 程统计子系统可以告诉你。它还对跟踪一个侵入者有帮助。与连接时间日志不同，进程统计子系统默认不激活，它必须启动。在Linux系统中启动进程统计使用 accton命令，必须用root身份来运行。
+   accton命令的形式为：accton file，file必须事先存在。
+  先使用touch命令创建pacct文件：touch /var/log/pacct，然后运行accton：accton /var/log/pacct。一旦accton被激活，就可以使用lastcomm命令监测系统中任何时候执行的命令。若要关闭统计，可以使用不带任何 参数的accton命令。
+ 
+lastcomm命令报告以前执行的文件。不带参数时，lastcomm命令显示当前统计文件生命周期内记录的所有命令的有关信息。包括命令名、用户、tty、命令花费的CPU时间和一个时间戳。如果系统有许多用户，输入则可能很长。看下面的例子：
+ 
+crond F root ?? 0.00 secs Sun Aug 20 00:16
+promisc_check.s S root ?? 0.04 secs Sun Aug 20 00:16
+promisc_check root ?? 0.01 secs Sun Aug 20 00:16
+grep root ?? 0.02 secs Sun Aug 20 00:16
+tail root ?? 0.01 secs Sun Aug 20 00:16
+sh root ?? 0.01 secs Sun Aug 20 00:15
+ping S root ?? 0.01 secs Sun Aug 20 00:15
+ping6.pl F root ?? 0.01 secs Sun Aug 20 00:15
+sh root ?? 0.01 secs Sun Aug 20 00:15
+ping S root ?? 0.02 secs Sun Aug 20 00:15
+ping6.pl F root ?? 0.02 secs Sun Aug 20 00:15
+sh root ?? 0.02 secs Sun Aug 20 00:15
+ping S root ?? 0.00 secs Sun Aug 20 00:15
+ping6.pl F root ?? 0.01 secs Sun Aug 20 00:15
+sh root ?? 0.01 secs Sun Aug 20 00:15
+ping S root ?? 0.01 secs Sun Aug 20 00:15
+sh root ?? 0.02 secs Sun Aug 20 00:15
+ping S root ?? 1.34 secs Sun Aug 20 00:15
+locate root ttyp0 1.34 secs Sun Aug 20 00:15
+accton S root ttyp0 0.00 secs Sun Aug 20 00:15
+ 
+   进程统计的一个问题是pacct文件可能增长得十分迅速。这时需要交互式地或经过 cron机制运行sa命令来保证日志数据在系统控制内。sa命令报告、清理并维护进程统计文件。它能把/var/log/pacct中的信息压缩到摘要文 件/var/log/savacct和 /var/log/usracct中。这些摘要包含按命令名和用户名分类的系统统计数据。在默认情况下sa先读它们，然后读pacct文件，使报告能包含 所有的可用信息。sa的输出有下面一些标记项。
+
+
+/var/log目录下的20个Linux日志文件功能详解 :
+
+如果愿意在Linux环境方面花费些时间，首先就应该知道日志文件的所在位置以及它们包含的内容。在系统运行正常的情况下学习了解这些不同的日志文件有助于你在遇到紧急情况时从容找出问题并加以解决。
+
+以下介绍的是20个位于/var/log/ 目录之下的日志文件。其中一些只有特定版本采用，如dpkg.log只能在基于Debian的系统中看到。
+/var/log/messages — 包括整体系统信息，其中也包含系统启动期间的日志。此外，mail，cron，daemon，kern和auth等内容也记录在var/log/messages日志中。
+/var/log/dmesg — 包含内核缓冲信息（kernel ring buffer）。在系统启动时，会在屏幕上显示许多与硬件有关的信息。可以用dmesg查看它们。
+/var/log/auth.log — 包含系统授权信息，包括用户登录和使用的权限机制等。
+/var/log/boot.log — 包含系统启动时的日志。
+/var/log/daemon.log — 包含各种系统后台守护进程日志信息。
+/var/log/dpkg.log – 包括安装或dpkg命令清除软件包的日志。
+/var/log/kern.log – 包含内核产生的日志，有助于在定制内核时解决问题。
+/var/log/lastlog — 记录所有用户的最近信息。这不是一个ASCII文件，因此需要用lastlog命令查看内容。
+/var/log/maillog /var/log/mail.log — 包含来着系统运行电子邮件服务器的日志信息。例如，sendmail日志信息就全部送到这个文件中。
+/var/log/user.log — 记录所有等级用户信息的日志。
+/var/log/Xorg.x.log — 来自X的日志信息。
+/var/log/alternatives.log – 更新替代信息都记录在这个文件中。
+/var/log/btmp – 记录所有失败登录信息。使用last命令可以查看btmp文件。例如，”last -f /var/log/btmp | more“。
+/var/log/cups — 涉及所有打印信息的日志。
+/var/log/anaconda.log — 在安装Linux时，所有安装信息都储存在这个文件中。
+/var/log/yum.log — 包含使用yum安装的软件包信息。
+/var/log/cron — 每当cron进程开始一个工作时，就会将相关信息记录在这个文件中。
+/var/log/secure — 包含验证和授权方面信息。例如，sshd会将所有信息记录（其中包括失败登录）在这里。
+/var/log/wtmp或/var/log/utmp — 包含登录信息。使用wtmp可以找出谁正在登陆进入系统，谁使用命令显示这个文件或信息等。
+/var/log/faillog – 包含用户登录失败信息。此外，错误登录命令也会记录在本文件中。
+
+除了上述Log文件以外， /var/log还基于系统的具体应用包含以下一些子目录：
+/var/log/httpd/或/var/log/apache2 — 包含服务器access_log和error_log信息。
+/var/log/lighttpd/ — 包含light HTTPD的access_log和error_log。
+/var/log/mail/ – 这个子目录包含邮件服务器的额外日志。
+/var/log/prelink/ — 包含.so文件被prelink修改的信息。
+/var/log/audit/ — 包含被 Linux audit daemon储存的信息。
+/var/log/samba/ – 包含由samba存储的信息。
+/var/log/sa/ — 包含每日由sysstat软件包收集的sar文件。
+/var/log/sssd/ – 用于守护进程安全服务。
+
+除了手动存档和清除这些日志文件以外，还可以使用logrotate在文件达到一定大小后自动删除。可以尝试用vi，tail，grep和less等命令查看这些日志文件。
+
+
+ 对于Linux 的系统安全来说，日志文件是极其重要的工具。系统管理员可以使用logrotate 程序用来管理系统中的最新的事件，对于Linux 的系统安全来说，日志文件是极其重要的工具。系统管理员可以使用logrotate 程序用来管理系统中的最新的事件。logrotate 还可以用来备份日志文件，本篇将通过以下几部分来介绍 
+ 
+日志文件的管理：
+1、logrotate 配置
+2、缺省配置 logrotate
+3、使用include 选项读取其他配置文件
+4、使用include 选项覆盖缺省配置
+5、为指定的文件配置转储参数
+一、logrotate 配置
+
+logrotate 程序是一个日志文件管理工具。用来把旧的日志文件删除，并创建新的日志文件，我们把它叫做“转储”。我们可以根据日志文件的大小，也可以根据其天数来转储，这个过程一般通过 cron 程序来执行。
+logrotate 程序还可以用于压缩日志文件，以及发送日志到指定的E-mail 。
+
+logrotate 的配置文件是 /etc/logrotate.conf。主要参数如下表：
+
+参数 功能
+compress 通过gzip 压缩转储以后的日志
+nocompress 不需要压缩时，用这个参数
+copytruncate 用于还在打开中的日志文件，把当前日志备份并截断
+nocopytruncate 备份日志文件但是不截断
+create mode owner group 转储文件，使用指定的文件模式创建新的日志文件
+nocreate 不建立新的日志文件
+delaycompress 和 compress 一起使用时，转储的日志文件到下一次转储时才压缩
+nodelaycompress 覆盖 delaycompress 选项，转储同时压缩。
+errors address 专储时的错误信息发送到指定的Email 地址
+ifempty 即使是空文件也转储，这个是 logrotate 的缺省选项。
+notifempty 如果是空文件的话，不转储
+mail address 把转储的日志文件发送到指定的E-mail 地址
+nomail 转储时不发送日志文件
+olddir directory 转储后的日志文件放入指定的目录，必须和当前日志文件在同一个文件系统
+noolddir 转储后的日志文件和当前日志文件放在同一个目录下
+prerotate/endscript 在转储以前需要执行的命令可以放入这个对，这两个关键字必须单独成行
+postrotate/endscript 在转储以后需要执行的命令可以放入这个对，这两个关键字必须单独成行
+daily 指定转储周期为每天
+weekly 指定转储周期为每周
+monthly 指定转储周期为每月
+rotate count 指定日志文件删除之前转储的次数，0 指没有备份，5 指保留5 个备份
+tabootext [+] list 让logrotate 不转储指定扩展名的文件，缺省的扩展名是：.rpm-orig, .rpmsave, v, 和 ~ 
+size size 当日志文件到达指定的大小时才转储，Size 可以指定 bytes (缺省)以及KB (sizek)或者MB (sizem). 
+二、缺省配置 logrotate
+
+logrotate 缺省的配置募?/etc/logrotate.conf。
+Red Hat Linux 缺省安装的文件内容是：
+
+# see "man logrotate" for details
+# rotate log files weekly
+weekly
+
+# keep 4 weeks worth of backlogs
+rotate 4
+
+# send errors to root
+errors root
+# create new (empty) log files after rotating old ones
+create
+
+# uncomment this if you want your log files compressed
+#compress
+1
+# RPM packages drop log rotation information into this directory
+include /etc/logrotate.d
+
+# no packages own lastlog or wtmp --we'll rotate them here
+/var/log/wtmp {
+monthly
+create 0664 root utmp
+rotate 1
+}
+
+/var/log/lastlog {
+monthly
+rotate 1
+}
+
+# system-specific logs may be configured here
+
+
+缺省的配置一般放在logrotate.conf 文件的最开始处，影响整个系统。在本例中就是前面12行。
+
+第三行weekly 指定所有的日志文件每周转储一次。
+第五行 rotate 4 指定转储文件的保留 4份。
+第七行 errors root 指定错误信息发送给root。
+第九行create 指定 logrotate 自动建立新的日志文件，新的日志文件具有和
+原来的文件一样的权限。
+第11行 #compress 指定不压缩转储文件，如果需要压缩，去掉注释就可以了。
+
+三、使用include 选项读取其他配置文件
+include 选项允许系统管理员把分散到几个文件的转储信息，集中到一个
+主要的配置文件。当 logrotate 从logrotate.conf 读到include 选项时，会从指定文件读入配置信息，就好像他们已经在/etc/logrotate.conf 中一样。
+
+第13行 include /etc/logrotate.d 告诉 logrotate 读入存放在/etc/logrotate.d 目录中的日志转储参数，当系统中安装了RPM 软件包时，使用include 选项十分有用。RPM 软件包的日志转储参数一般存放在/etc/logrotate.d 目录。
+
+include 选项十分重要，一些应用把日志转储参数存放在 /etc/logrotate.d 。
+
+典型的应用有：apache, linuxconf, samba, cron 以及syslog。
+
+这样，系统管理员只要管理一个 /etc/logrotate.conf 文件就可以了。
+
+ 
+ 
+
+ 
+四、使用include 选项覆盖缺省配置
+
+当 /etc/logrotate.conf 读入文件时，include 指定的文件中的转储参数将覆盖缺省的参数，如下例：
+
+# linuxconf 的参数
+/var/log/htmlaccess.log
+{ errors jim
+notifempty
+nocompress
+weekly
+prerotate
+/usr/bin/chattr -a /var/log/htmlaccess.log
+endscript
+postrotate
+/usr/bin/chattr +a /var/log/htmlaccess.log
+endscript
+}
+/var/log/netconf.log
+{ nocompress
+monthly
+}
+
+在这个例子中，当 /etc/logrotate.d/linuxconf 文件被读入时，下面的参数将覆盖/etc/logrotate.conf中缺省的参数。
+
+Notifempty
+errors jim
+
+五、为指定的文件配置转储参数
+经常需要为指定文件配置参数，一个常见的例子就是每月转储/var/log/wtmp。为特定文件而使用的参数格式是：
+
+# 注释
+/full/path/to/file
+{
+option(s)
+}
+
+下面的例子就是每月转储 /var/log/wtmp 一次：
+#Use logrotate to rotate wtmp
+/var/log/wtmp
+{
+monthly
+rotate 1
+}
+
+ 
+六、其他需要注意的问题
+
+1、尽管花括号的开头可以和其他文本放在同一行上，但是结尾的花括号必须单独成行。
+
+2、使用 prerotate 和 postrotate 选项
+下面的例子是典型的脚本 /etc/logrotate.d/syslog，这个脚本只是对
+/var/log/messages 有效。
+
+/var/log/messages
+{ 
+prerotate
+/usr/bin/chattr -a /var/log/messages
+endscript
+postrotate
+/usr/bin/kill -HUP syslogd
+/usr/bin/chattr +a /var/log/messages
+endscript
+}
+
+第一行指定脚本对 /var/log messages 有效
+花括号外的/var/log messages 
+
+ 
+ 
+
+ 
+prerotate 命令指定转储以前的动作/usr/bin/chattr -a 去掉/var/log/messages文件的“只追加”属性 endscript 结束 prerotate 部分的脚本postrotate 指定转储后的动作
+
+/usr/bin/killall -HUP syslogd 
+
+用来重新初始化系统日志守护程序 syslogd
+
+/usr/bin/chattr +a /var/log/messages 
+
+重新为 /var/log/messages 文件指定“只追加”属性，这样防治程序员或用户覆盖此文件。
+
+最后的 endscript 用于结束 postrotate 部分的脚本
+
+3、logrotate 的运行分为三步：
+
+判断系统的日志文件，建立转储计划以及参数，通过cron daemon 运行下面的代码是 Red Hat Linux 缺省的crontab 来每天运行logrotate。
+
+#/etc/cron.daily/logrotate
+#! /bin/sh
+
+/usr/sbin/logrotate /etc/logrotate.conf
+
+4、/var/log/messages 不能产生的原因：
+这种情况很少见，但是如果你把/etc/services 中的 514/UDP 端口关掉的话，这个文件就不能产生了。
+
+小结：本文通过对Red Hat 系统上典型的logrotate 配置例子的介绍，详细说明了logrotate 程序的应用方法。希望对所有Linux 系统管理员有所帮助。管理好，分析好日志文件是系统安全的第一步，在以后的文章里FreeLAMP还会介绍另外一个检查日志的好东东 logcheck。
+  
+IPV4地址
+IPV4地址是32位数值，通常使用点号分隔4个8字节（取值范围从0到255）表示。地址分为2个部分：网络部分和主机部分。位于同一子网中的所有主机可以在彼此之间直接通信，无需路由器，这些主机具有相同的网络部分。网络部分用于标识子网。同一子网中的任何2台主机都不能具有相同的主机部分，主机部分用于标识子网中的特定主机。
+要分清IPV4地址中的网络部分和主机部分，需要知道分配给子网的子网掩码，子网掩码指明有多少位iPv4地址属于子网，可供主机部分使用的位数越多，子网中的主机就越多。
+将子网中可能达到的最低地址（主机部分的二进制值全为0）称为网络地址，将子网中可能达到的最高地址（主机部分的二进制值全为1）用于广播消息，该地址称为广播地址。
+子网掩码可用两种格式表示:255.255.255.0  前缀：/24
+特殊地址127.0.0.1始终指向本地系统localhost
+
+不管使用IPV4还是IPV6，网络流量都需要以主机到主机和网络到网络的形式进行传输，每一主机具有一个路由表，该表告诉主机如何路由特定的网络的通信，路由表条目列出目标网络，向其发送通信的接口，以及任何中间路由器的IP地址。与网络流量目的地相符的路由表条目用于路由该流量，如果2个条目匹配，则使用前缀最长的那个。如果网络流量匹配不到更加具体的路由，则路由表通常拥有一个路由到整个IPV4互联网的默认路由条目0.0.0.0/0，此默认路由指向位于可到达子网上的路由器，即在主机的路由表中拥有更加具体的路由的子网上。如果路由器收到的通信并非将其作为寻址目标，则路由器不会像普通主机那样忽略该通信，而是根据自己的路由表转发该通信。这种处理方式可能会将通信直接发送到目标主机，也可能转发到其他路由器，这种转发过程会一直进行，直到流量到达最终目标。
+
+
+
+IP协议使用地址进行通信，但是比起冗长且难记的数字字符串，使用名称显得更加方便，DNS即域名系统是分布式服务网络，可将主机名映射到IP地址，需要将一个名称服务器指向主机，该名称服务器无需与主机位于同一子网上，只需可供主机访问即可。
+许多系统配置为在启动时自动获取网络配置，这些本地配置文件指明应对使用DHCP（动态主机配置协议 Dynamic Host Configuration Protocol），如果没有可用的DHCP服务器，系统必须使用静态配置，其中从本地配置文件读取网络设置。由于DHCP使用硬件地址来跟踪分配，每个接口仅可通过DHCP分配一个地址，但一个接口可以指定多个静态地址。
+
+网络接口名称
+接口名称具有下列字符：
+以太网接口以en开头，WLAN接口以w1开头，而WWAN接口则以ww开头
+适配器类型：o代表板载  s代表热插拔插槽 p代表PCI地理位置 x用于融入MAC地址
+数字N代表索引，ID或端口，如果无法确定固定名称，则使用ethN等传统的名称
+
+显示IP地址
+查看IP地址
+ip a
+ip addr show 
+	#查看所有网卡的网络配置
+ip addr show eth0 
+	#只查看eth0网卡
+结果可以显示活动接口的状态，设备的硬件MAC地址，IPV4地址和前缀，广播地址、作用域和设备名称，IPV6信息
+ifconfig 
+ifconfig eth0
+	#mtu 最大传输单元，本地封装帧的大小，默认1500字节，如果做2层VPN，需要调小MTU值，因为VPN会多加一个头部
+	#广播地址：DHCP,ARP会用到
+
+ip -s link show eth0 
+	#可以显示网络性能的统计信息，收RX和发TX的数据包、错误和丢弃计数器，发现网络丢包时查看
+ 
+路由故障排除
+route -n
+ip route  #显示路由信息
+	 
+
+ping #测试连接，该命令将保持运行，直到按下ctrl+c组合键为止
+ping -c 
+	#指定ping多少次
+ping -I eth0 
+	#指定接口去ping
+traceroute/tracepath
+	#跟踪路由UDP数据包路径，traceroute命令拥有可以跟踪UDP、ICMP、TCP数据包路径的选项
+	tracepath输出中每一行代表路由器或跃点，数据包在来源和最终目标位置之间要经过它们
+
+端口和服务故障排除
+TCP服务使用套接字作为通信的端点，其由IP地址，协议和端口号组成。服务通常侦听标准端口，而客户端则使用随机的可用端口。/etc/service文件中列出了标准端口的常用名称。
+ss命令可用于显示套接字统计信息，ss命令旨在替换netstat命令。
+
+	
+	
+	
+	
+	 
+配置网卡IP地址
+设备：一个网卡就是一个设备
+对于一个设备而言，会有一个设备名
+所谓连接就是供设备使用的配置，其由一组设置组成。同一设备可能存在多个连接，但一次只能有一个保持活动状态。
+命令行和图形工具（nm-connection-editor）与NetworkManager通信，并将配置文件保存在/etc/sysconfig/network-scripts目录中 
+ip addr show
+	#查看网络 
+cat /etc/sysconfig/network-scripts/ifcfg-eth0
+	#网卡的连接文件
+	#连接文件：一个设备的配置信息的集合。把一个设备的信息写在一个文件里，这个文件就是连接文件
+	#一个网卡可以有多个连接文件，但是某个固定时刻，只能有一个处于激活状态
+ 
+设置IP的思路：
+1.查看设备有没有连接文件
+nmcli connection show 
+	#查看当前已经存在的连接文件，包含所有启用的，和没有启用的文件。
+	#DEVICE表示这个连接文件关联了哪个设备，并且处于激活状态
+nmcli connection show --active 
+	#查看处于激活状态的连接文件
+nmcli connection show "eth0" 指定连接ID（名称），查看该连接的详细信息，小写设置表示该连接的配置，大写设置为活动数据
+nmcli dev status 显示设备状态和详细信息
+
+通过nmcli创建网络连接时，参数的顺序非常重要，首先为共用参数，必须包含类型和接口，接下来，指定任何与类型相关的参数，最后指定IP地址、前缀和网关信息。可以为一个设备指定多个IP地址，其他设置可以在连接存在后作为修改进行设置，如DNS服务器
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           
+2.如果一个网卡没有连接文件，通过设备名新建连接文件
+nmcli connection add type ethernet con-name name0 ifname eth0 
+	#为eth0创建一个连接文件，删除，直接删除文件就可
+	#如果给主机新加一张网卡，需要用这个命令给新网卡创建一个连接文件，不会自动生成
+nmcli connection up name0
+	#激活这个连接文件，只有这个连接文件激活以后，才能通过nmcli connection show命令查看到这个连接文件关联的是哪个设备
+nmcli connection show name0
+	#查看name0这个连接文件的详细信息，这里就可以看到这个连接文件关联的是哪个设备
+
+[root@server0 ~]# nmcli dev show eth0
+GENERAL.DEVICE:                         eth0
+GENERAL.TYPE:                           ethernet
+GENERAL.HWADDR:                         52:54:00:00:00:0B
+GENERAL.MTU:                            1500
+GENERAL.STATE:                          100 (connected)
+GENERAL.CONNECTION:                     System eth0
+GENERAL.CON-PATH:                       /org/freedesktop/NetworkManager/ActiveConnection/0
+WIRED-PROPERTIES.CARRIER:               on
+IP4.ADDRESS[1]:                         ip = 172.25.0.11/24, gw = 172.25.0.254
+IP4.ROUTE[1]:                           dst = 172.25.253.254/32, nh = 172.25.0.254, mt = 0
+IP4.DNS[1]:                             172.25.254.254
+IP4.DOMAIN[1]:                          example.com
+IP6.ADDRESS[1]:                         ip = fe80::5054:ff:fe00:b/64, gw = ::
+[root@server0 ~]# nmcli con add type ethernet con-name "static-eth0" ifname eth0 ip4 172.25.0.11/24 gw4 172.25.0.254
+Connection 'static-eth0' (f6507709-58df-4741-89a8-e3ffe4e9a784) successfully added.
+[root@server0 ~]# nmcli con mod "static-eth0" ipv4.dns 172.25.254.254
+[root@server0 ~]# nmcli con show
+NAME         UUID                                  TYPE            DEVICE 
+static-eth0  f6507709-58df-4741-89a8-e3ffe4e9a784  802-3-ethernet  --     
+System eth0  5fb06bd0-0bb0-7ffb-45f1-d6edd65f3e03  802-3-ethernet  eth0   
+[root@server0 ~]# nmcli con show --active
+NAME         UUID                                  TYPE            DEVICE 
+System eth0  5fb06bd0-0bb0-7ffb-45f1-d6edd65f3e03  802-3-ethernet  eth0 
+[root@server0 ~]# cat /etc/sysconfig/network-scripts/ifcfg-static-eth0 
+TYPE=Ethernet
+BOOTPROTO=none
+IPADDR0=172.25.0.11
+PREFIX0=24
+GATEWAY0=172.25.0.254
+DEFROUTE=yes
+IPV4_FAILURE_FATAL=no
+IPV6INIT=yes
+IPV6_AUTOCONF=yes
+IPV6_DEFROUTE=yes
+IPV6_FAILURE_FATAL=no
+NAME=static-eth0
+UUID=f6507709-58df-4741-89a8-e3ffe4e9a784
+DEVICE=eth0
+ONBOOT=yes
+DNS1=172.25.254.254
+IPV6_PEERDNS=yes
+IPV6_PEERROUTES=yes
+[root@server0 ~]# nmcli con up "static-eth0"
+Connection successfully activated (D-Bus active path: /org/freedesktop/NetworkManager/ActiveConnection/1)
+[root@server0 ~]# nmcli con show
+NAME         UUID                                  TYPE            DEVICE 
+static-eth0  f6507709-58df-4741-89a8-e3ffe4e9a784  802-3-ethernet  eth0   
+System eth0  5fb06bd0-0bb0-7ffb-45f1-d6edd65f3e03  802-3-ethernet  --     
+[root@server0 ~]# nmcli con show --active
+NAME         UUID                                  TYPE            DEVICE 
+static-eth0  f6507709-58df-4741-89a8-e3ffe4e9a784  802-3-ethernet  eth0 
+[root@server0 ~]# ip a
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether 52:54:00:00:00:0b brd ff:ff:ff:ff:ff:ff
+    inet 172.25.0.11/24 brd 172.25.0.255 scope global eth0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::5054:ff:fe00:b/64 scope link 
+       valid_lft forever preferred_lft forever
+ 
+
+
+通过MAC地址创建连接文件(可以用这个方法来改设备名，前提：先把该设备的原连接文件删掉)
+nmcli connection add type ethernet con-name name0 ifname eth0 mac aa:dd:cc:bb
+	#新建一个网卡设备，用MAC地址来创建，并创建连接文件，叫name0，并给这个设备定义一个名字，叫eth0
+
+可以通过nmcli con mod参数修改现有的连接，参数为键/值对组合。键包含设置名称和属性名称，可以使用nmcli con show ID查看当前值的列表。
+
+修改网络配置
+连接文件存在的时候可以还直接去编辑这个连接文件，这些文件命名为vim /etc/sysconfig/network-scripts/ifcfg-<name>,其中name是指配置文件控制的设备或连接的名称
+vim /etc/sysconfig/network-scripts/ifcfg-eth0
+	ONBOOT＝yes 表示开机的时候，是否激活这个连接文件
+	BOOTPROTO=static或none、dhcp
+	IPADDR1=10.0.0.1
+	PREFIX1=24  #NETMASK1=255.255.255.0
+	GATEWAY1=10.0.0.254
+	IPADDR2=10.0.1.1
+	PREFIX2=24
+	GATEWAY2=10.0.1.254
+	DNS1=8.8.8.8	#这里的DNS1和前面的IPADDR1没任何关系，针对的是整个网络
+	DNS2=8.8.4.4
+systemctl restart network重启服务或nmcli con reload重新加载配置更改再nmcli con up "eth0"
+注意：如果一个网卡有两个连接文件，不要让两个文件的ONBOOT都等于yes
+
+
+ 
+DNS
+	配好连接文件，重启网络后，会把连接文件里面的DNS信息写入到/etc/resolv.conf
+	永久生效的信息只会从连接文件中复制过来，手动输入的，也可以生效，但是一重启网络，手写的就会被覆盖
+	如果有两张网卡，都配了DNS，按网卡启动顺序，会把两张网卡上配的DNS全部写到/etc/resolv.conf这个文件，但只有前3个生效
+	 
+网关
+如果一个网卡设了多个IP，IPADDR1的网关成为默认网关，可route -n查看
+如果一台机有两个网卡，只有一个生效。
+ 
+怎么查看一个网卡配置的网关：
+route -n
+ip route
+ 
+添加临时的IP，重启失效
+ip addr add 3.3.3.3/24 dev eth0
+	#为eth0临时加一个IP，重启失效
+ip addr del 3.3.3.3/24 dev eth0
+	#删除
+ 
+添加临时路由，重启失效
+ip route add 3.3.3.0/24 dev eth0
+	#意思是访问3.3.3.0/24这个网段从eth0这个网卡出去
+ip route add 3.3.3.0/24 via 10.0.0.254
+	#也可以指定下一跳IP
+ 
+子接口设置
+nmcli connection add type ethernet con-name eth0:0 ifname eth0:0
+vim /etc/sysconfig/network-scripts/ifcfg-eth0:0
+	ONPARENT=yes 	#添加这一行到连接文件，表示随父接口启动
+reboot
+ 
+图形化设置IP
+nm-connection-editor
+ 
+配置主机名和名称解析
+hostname命令显示或临时修改系统的完全限定主机名。可以在/etc/hostname（存储静态主机名）文件中指定静态主机名，hostnamectl命令用于修改此文件。也可用于查看系统的完全限定主机名的状态，如果此文件不存在，则主机名在接口被分配了IP地址时由反向DNS查询设定。
+hostnamectl set-hostname server0.example.com
+	#这条命令就是把主机名写到/etc/hostname
+hostnamectl status 显示主机名状态
+
+配置名称解析
+检查/etc/hosts文件内容，可以通过getent hosts hostname/IP命令，利用/etc/hosts文件测试主机名解析。如果在该文件中未找到条目，根解析器将从DNS名称服务器中查找信息，/etc/resolv.conf文件控制如何完成该查询：
+nameserver要查询的名称服务器的IP地址，可以指定最多3个名称服务器指令，以在其中一个名称服务器停机时提供备用名称服务器
+search对于较短主机名尝试搜索的域名列表，不应在同一文件中设置此参数和domain，如果在同一个文件中设置它们，将使用最后一个实例。
+NetworkManager将使用连接配置文件中的DNS设置更新/etc/resolv.conf文件。nmcli con mod ID ipv4.dns IP的默认行为将任何旧的DNS设置替换为提供的新IP列表。ipv4.dns参数前面的+/-符号将添加或删除条目。
+使用host HOSTNAME命令测试DNS服务器的连接
+
+
+实验：P272
+
+
+开机过程指的是从打开计算机电源直到LINUX显示用户登录画面的全过程。分析LINUX开机过程也是深入了解LINUX核心工作原理的一个很好的途径。
+启动第一步--加载BIOS
+          当你打开计算机电源，计算机会首先加载BIOS信息，BIOS信息是如此的重要，以至于计算机必须在最开始就找到它。这是因为BIOS中包含了 CPU的相关信息、设备启动顺序信息、硬盘信息、内存信息、时钟信息、PnP特性等等。在此之后，计算机心里就有谱了，知道应该去读取哪个硬件设备了。在 BIOS将系统的控制权交给硬盘第一个扇区之后，就开始由Linux来控制系统了。
+启动第二步--读取MBR
+硬盘上第0磁道第一个扇区被称为MBR，也就是Master Boot Record，即主引导记录，它的大小是512字节，可里面却存放了预启动信息、分区表信息。可分为两部分：第一部分为引导(PRE-BOOT)区，占了 446个字节;第二部分为分区表(PARTITION PABLE)，共有66个字节，记录硬盘的分区信息。预引导区的作用之一是找到标记为活动(ACTIVE)的分区，并将活动分区的引导区读入内存。　　系统找到BIOS所指定的硬盘的MBR后，就会将其复制到0×7c00地址所在的物理内存中。其实被复制到物理内存的内容就是Boot Loader，而具体到你的电脑，那就是lilo或者grub了。
+启动第三步--Boot Loader
+Boot Loader 就是在操作系统内核运行之前运行的一段小程序。通过这段小程序，我们可以初始化硬件设备、建立内存空间的映射图，从而将系统的软硬件环境带到一个合适的状 态，以便为最终调用操作系统内核做好一切准备。通常，BootL oade:是严重地依赖于硬件而实现的，不同体系结构的系统存在着不同的Boot Loader。　　Linux的引导扇区内容是采用汇编语言编写的程序，其源代码在arch/i386/boot中(不同体系的CPU有其各自的boot目录)，有4个程序文件：　　◎bootsect.S，引导扇区的主程序，汇编后的代码不超过512字节，即一个扇区的 大 小　　◎setup.S， 引导辅助程序　　◎edd.S,辅助程序的一部分，用于支持BIOS增强磁盘设备服务　　◎video.S,辅助程序的另一部分，用于引导时的屏幕显示　　Boot Loader有若干种，其中Grub、Lilo和spfdisk是常见的Loader，这里以Grub为例来讲解吧。　　系统读取内存中的grub配置信息(一般为menu.lst或grub.lst)，并依照此配置信息来启动不同的操作系统。
+启动第四步--加载内核
+根据grub设定的内核映像所在路径，系统读取内存映像，并进行解压缩操作。此时，屏幕一般会输出“Uncompressing Linux”的提示。当解压缩内核完成后，屏幕输出“OK, booting the kernel”。　　系统将解压后的内核放置在内存之中，并调用start_kernel()函数来启动一系列的初始化函数并初始化各种设备，完成Linux核心环境的建立。至此，Linux内核已经建立起来了，基于Linux的程序应该可以正常运行了。　　start_kenrel()定义在init/main.c中，它就类似于一般可执行程序中的main()函数，系统在此之前所做的仅仅是一些 能让内核程序最低限度执行的初始化操作，真正的内核初始化过程是从这里才开始。函数start_kerenl()将会调用一系列的初始化函数，用来完成内 核本身的各方面设置，目的是最终建立起基本完整的Linux核心环境。
+start_kernel()中主要执行了以下操作：
+(1) 在屏幕上打印出当前的内核版本信息。
+(2) 执行setup_arch()，对系统结构进行设置。
+(3)执行sched_init()，对系统的调度机制进行初始化。先是对每个可用CPU上的runqueque进行初始化;然后初始化0号进 程(其task struct和系统空M堆栈在startup_32()中己经被分配)为系统idle进程，即系统空闲时占据CPU的进程。
+(4)执行parse_early_param()和parsees_args()解析系统启动参数。
+(5)执行trap_in itQ，先设置了系统中断向量表。0-19号的陷阱门用于CPU异常处理;然后初始化系统调用向量;最后调用cpu_init()完善对CPU的初始化， 用于支持进程调度机制，包括设定标志位寄存器、任务寄存器、初始化程序调试相关寄存器等等。
+(6)执行rcu_init()，初始化系统中的Read-Copy Update互斥机制。
+(7)执行init_IRQ()函数，初始化用于外设的中断，完成对IDT的最终初始化过程。
+(8)执行init_timers()， softirq_init()和time_init()函数，分别初始系统的定时器机制，软中断机制以及系统日期和时间。
+(9)执行mem_init()函数，初始化物理内存页面的page数据结构描述符，完成对物理内存管理机制的创建。
+(10)执行kmem_cache_init()，完成对通用slab缓冲区管理机制的初始化工作。
+(11)执行fork_init()，计算出当前系统的物理内存容量能够允许创建的进程(线程)数量。
+(12)执行proc_caches_init() , bufer_init()， unnamed_dev_init() ,vfs_caches_init()， signals_init()等函数对各种管理机制建立起专用的slab缓冲区队列。
+(13 )执行proc_root_init()Wl数，对虚拟文件系统/proc进行初始化。　　在 start_kenrel()的结尾，内核通过kenrel_thread()创建出第一个系统内核线程(即1号进程)，该线     程   执行的是内核中的 init()函数，负责的是下一阶段的启动任务。最后调用cpues_idle()函数：进入了系统主循环体口默认将一直执行 default_idle()函数中的指令，即CPU的halt指令，直到就绪队列中存在其他进程需要被调度时才会转向执行其他函数。此时，系统中唯一存 在就绪状态的进程就是由kerne_hread()创建的init进程(内核线程)，所以内核并不进入default_idle()函数，而是转向 init()函数继续启动过程。
+启动第五步--用户层init依据inittab文件来设定运行等级
+内核被加载后，第一个运行的程序便是/sbin/init，该文件会读取/etc/inittab文件，并依据此文件来进行初始化工作。　　其实/etc/inittab文件最主要的作用就是设定Linux的运行等级，其设定形式是“：id:5:initdefault:”，这就表明Linux需要运行在等级5上。Linux的运行等级设定如下：
+0：关机
+1：单用户模式
+2：无网络支持的多用户模式
+3：有网络支持的多用户模式
+4：保留，未使用
+5：有网络支持有X-Window支持的多用户模式
+6：重新引导系统，即重启
+启动第六步--init进程执行rc.sysinit
+在设定了运行等级后，Linux系统执行的第一个用户层文件就是/etc/rc.d/rc.sysinit脚本程序，它做的工作非常多，包括设 定PATH、设定网络配置(/etc/sysconfig/network)、启动swap分区、设定/proc等等。如果你有兴趣，可以到/etc /rc.d中查看一下rc.sysinit文件。
+线程init的最终完成状态是能够使得一般的用户程序可以正常地被执行，从而真正完成可供应用程序运行的系统环境。它主要进行的操作有：
+(1) 执行函数do_basic_setup()，它会对外部设备进行全面地初始化。
+(2) 构建系统的虚拟文件系统目录树，挂接系统中作为根目录的设备(其具体的文 件系统已经在上一步骤中注册)。
+(3) 打开设备/dev/console，并通过函数sys_dup()打开的连接复制两次，使得文件号0,1 ,2 全部指向控制台。这三个文件连接就是通常所说的“标准输入”stdin,“标准输出”stdout和“标准出错信息”stderr这三个标准I/O通道。
+(4) 准备好以上一切之后，系统开始进入用户层的初始化阶段。内核通过系统调用execve()加载执T子相应的用户层初始化程序，依次尝试加载程 序"/sbin/initl"," /etc/init"," /bin/init'，和“/bin/sh。只要其中有一个程序加载获得成功，那么系统就将开始用户层的初始化，而不会再回到init()函数段中。至 此，init()函数结束，Linux内核的引导 部分也到此结束。
+启动第七步--启动内核模块
+具体是依据/etc/modules.conf文件或/etc/modules.d目录下的文件来装载内核模块。
+启动第八步--执行不同运行级别的脚本程序
+根据运行级别的不同，系统会运行rc0.d到rc6.d中的相应的脚本程序，来完成相应的初始化工作和启动相应的服务。
+启动第九步--执行/etc/rc.d/rc.local
+你如果打开了此文件，里面有一句话，读过之后，你就会对此命令的作用一目了然：　　# This script will be executed *after* all the other init scripts.　　# You can put your own initialization stuff in here if you don’t　　# want to do the full Sys V style init stuff.　　rc.local就是在一切初始化工作后，Linux留给用户进行个性化的地方。你可以把你想设置和启动的东西放到这里。　　
+启动第十步--执行/bin/login程序，进入登录状态　　
+此时，系统已经进入到了等待用户输入username和password的时候了，你已经可以用自己的帐号登入系统了。
+1: 启动电源后，主机第一步先做的就是查询BIOS(全称：basic input/output system 基本输入输出系统)信息。了解整个系统的硬件状态，如CPU，内存，显卡，网卡等。嗯，这一步windows算和它是一家。不分彼此。
+2: 接下来，就是主机读取MBR(硬盘的第一个扇区)里的boot loader了。这个可是重点哦，据说troubleshooting里就会考这点，给个坏了的loader，叫你修正。windows不支持linux 的分区格式。所以，用windows的boot。ini是查不到linux的系统的。一般我装系统都是先装 windows再装linux，然后用grub来做boot loader。两个字：省心!因为linux不像windows那么小气。grub可是支持windows分区格式的哦。
+3: 接上一步，主机读取boot loader后，会读取里面的信息，知道谁跟谁是待在哪，假如主机想进入linux系统，读取到linux核心是在/boot文件目录中后，将此核心加载到内存中。开始了接下来的分析启动之旅。
+4: OK，第一个运行程序是谁？就是/sbin/init程序。不信，就用top程序看下，是不是PID为1的就是这个东东，它，可是万物之祖啊，我简称它是女娲娘娘(不喜欢亚当夏娃)。
+5: init首先查找启动等级(run-level)。因为启动等级不同，其运行脚本(也就是服务)会不同。默认的等级有以下几项：　　0 - halt (系统直接关机)　　1 - single user mode (单人模式，用于系统维护时使用)　　2 - Multi-user， without NFS (类似3模式，不过少了NFS服务)　　3 - Full multi-user mode (完整模式，不过，是文本模式)　　4 - unused (系统保留功能)　　5 - X11 (与3模式类似，不过，是X终端显示)　　6 - reboot (重新开机)　　(不要选择0或4，6 否则，进步了系统的)　　·
+6: OK。系统知道自己的启动等级后，接下来，不是去启动服务，而是，先设置好主机运行环境。读取的文件是/etc/rc。d/rc。sysinit文件。那究竟要设置哪些环境呢？　　· 设置网络环境/etc/sysconfig/network，如主机名，网关，IP，DNS等。　　· 挂载/proc。此文件是个特殊文件，大小为0，因为它是在内存当中。里面东东最好别删。　　· 根据内核在开机时的结果/proc/sys/kernel/modprobe。开始进行周边设备的侦测。　　· 载入用户自定义的模块/etc/sysconfig/modules/*。modules　　· 读取/etc/sysctl。conf文件对内核进行设定。　　· 设定时间，终端字体，硬盘LVM或RAID功能，以fsck进行磁盘检测。　　· 将开机状况记录到/var/log/dmesg中。(可以用命令dmesg查看结果)　　· 
+7: OK，接下来，就是启动系统服务了，不同的run-level会有不同的服务启动。到/etc/rc。d目录中，不同的level会有不同的目录。如启动 3模式，会有个rc3。d目录，里面就保存着服务。其中，S(start)开头的表明开机启动，K(kill)开头的表明开机不启动。数字表示启动顺序。 数字越小，启动越早。　　注意，他们都是连接到etc/rc。d/init。d/目录中的相关文件。所以，想手工启动某一服务，可以用"/etc/rc。d/init。 d/某个服务 start"启动哦。相反，我们也可以把某个服务ln(链接命令)到不同run-level的目录中。记得打上S或者K+数字哦。　　· 
+8: 读取服务后，主机会读取/etc/rc。d/rc。local文件。所以，如果需要什么开机启动的话，可以写个脚本或命令到这里面来。就不用像上面那么麻烦。以后删除也方便
+
+
+
+管理压缩的tar存档
+linux下常用的压缩工具：
+gzip 
+gzip file
+	#后面直接加上要压缩的文件名，原文件会消失，并且把压缩文件命名加.gz结尾的文件
+gzip -d file.gz
+	#解压缩，解压后，压缩文件也会消失
+	 
+怎么保留原文件呢？
+gzip -c file
+	#只会显示压缩后的文件，不会真的去压缩
+gzip -c file >> /tmp/file.gz
+	#这样就可以保留原文件
+	 
+bzip2
+bzip2 file 
+	#也是直接加文件名，原文件也没有了，以.bz2结尾
+bzip2 -d file
+	#解压，和gzip一样
+	 
+怎么保留原文件
+bzip2 -k file
+	#压缩保留原文件
+bzip2 -k -d file.bz2
+	#解压保留原文件
+	 
+xz
+xz file 
+	#以.xz结尾文件名
+xz -d file.xz 
+	#解压
+以上三种压缩方式只对文件生效。 
+[root@server0 ~]# gzip test
+gzip: test is a directory -- ignored
+[root@server0 ~]# bzip2 test
+bzip2: Input file test is a directory.
+[root@server0 ~]# xz test
+xz: test: Is a directory, skipping
+
+什么是tar？
+以上三种都不能压缩目录，所以有了tar工具
+tar只是一个打包（归档）工具，本身并不带压缩功能，它依赖其它压缩工具进行压缩
+先把一堆文件打包成一个文件，然后通过压缩工具，进行压缩，通过tar命令，用户可以将大型文件集汇集为一个文件（存档），该存档可以使用gzip，bzip2或xz压缩方式压缩。
+要使用tar命令，需要执行以下三个操作之一：
+c创建一个存档  t列出存档的内容  x提取存档  f filename要操作的存档的文件名  v详细信息，用于查看添加到存档中或从中提取的文件有哪些
+tar选项前不需要使用-，加上也可以
+	 
+使用归档文件和目录tar
+在创建tar存档之前，请先验证目录中没有其他存档与要创建的新存档名称相同，tar命令将覆盖现有的存档，而不提供任何反馈。创建新存档是要使用的第一选项为c选项，后跟f选项，接着是一个空格，然后是要创建的存档的文件名，最后是应当添加存档中的文件和目录列表，存档会默认创建在当前目录中，除非指定目录。
+tar -cvf dir.tar dir
+	#创建打包文件，把dir目录打包成dir.tar文件
+	#c 创建打包文件
+	#v 显示打包过程
+	#f 指定打包后的文件名，如果要加这个选项，必须写在选项的最后一个
+[root@desktop0 tmp]# tar cvzf /var/test.tar.gz 8.txt 9.txt tar
+8.txt
+9.txt
+tar/
+[root@desktop0 tmp]# ll /var
+total 24
+-rw-r--r--.  1 root root  163 Nov 25 04:45 test.tar.gz
+
+tar -xvf dir.tar
+	#解包
+tar -xvf dir.tar -C /tmp
+	#-C 把包解到指定目标路径
+	 
+du -sh /boot 
+	#查看一个目录及下所有文件大小
+要使tar可以归档选定的文件，执行tar命令的用户必须要能够读取这些文件
+ 
+tar tf filename.tar 列出tar存档内容
+
+提取创建的存档tar
+tar存档通常应当提取到空目录中，以确保它不会覆盖任何现有的文件，如果由root用户提取文件，tar将尝试保留文件的原始用户和组所有权，如果普通用户使用tar提取文件，则提取的文件由该用户所有。-C选项指定解压到的目标路径。要保留存档文件的权限，可在提取存档时使用p选项。
+
+[student@desktop0 tmp]$ ll
+total 24
+-rw-r--r--. 1 root    root    10240 Nov 25 04:25 7.tar
+-rw-r--r--. 1 root    root        0 Nov 25 04:10 7.txt
+-rw-rw-r--. 1 student student     0 Nov 25 04:30 8.txt
+-rw-rw-r--. 1 student student     0 Nov 25 04:30 9.txt
+drwxr-xr-x. 2 root    root        6 Nov 25 04:24 tar
+[student@desktop0 tmp]$ tar cvf test.tar 8.txt 9.txt tar
+8.txt
+9.txt
+tar/
+
+[student@desktop0 tmp]$ ll
+total 24
+-rw-r--r--. 1 root    root    10240 Nov 25 04:25 7.tar
+-rw-r--r--. 1 root    root        0 Nov 25 04:10 7.txt
+-rw-rw-r--. 1 student student     0 Nov 25 04:30 8.txt
+-rw-rw-r--. 1 student student     0 Nov 25 04:30 9.txt
+drwxrwxr-x. 2 student student     6 Nov 25 04:34 tarun
+-rw-rw-r--. 1 student student 10240 Nov 25 04:31 test.tar
+[root@desktop0 tmp]# tar xvf test.tar -C ./tarun/
+8.txt
+9.txt
+tar/
+[root@desktop0 tmp]# cd tarun/
+[root@desktop0 tarun]# ll
+total 0
+-rw-rw-r--. 1 student student 0 Nov 25 04:30 8.txt
+-rw-rw-r--. 1 student student 0 Nov 25 04:30 9.txt
+drwxr-xr-x. 2 root    root    6 Nov 25 04:24 tar
+
+
+[jason@desktop0 tmp]$ ll
+total 24
+-rw-r--r--. 1 root    root    10240 Nov 25 04:25 7.tar
+-rw-r--r--. 1 root    root        0 Nov 25 04:10 7.txt
+-rw-rw-r--. 1 student student     0 Nov 25 04:30 8.txt
+-rw-rw-r--. 1 student student     0 Nov 25 04:30 9.txt
+drwxr-xr-x. 2 root    root        6 Nov 25 04:24 tar
+drwxrwxrwx. 2 student student     6 Nov 25 04:37 tarun
+-rw-rw-r--. 1 student student 10240 Nov 25 04:31 test.tar
+
+[jason@desktop0 tmp]$ tar xvf test.tar -C ./tarun
+8.txt
+9.txt
+tar/
+[jason@desktop0 tmp]$ cd tarun/
+[jason@desktop0 tarun]$ ll
+total 0
+-rw-rw-r--. 1 jason jason 0 Nov 25 04:30 8.txt
+-rw-rw-r--. 1 jason jason 0 Nov 25 04:30 9.txt
+drwxr-xr-x. 2 jason jason 6 Nov 25 04:24 tar
+
+创建压缩的tar存档
+tar命令支持三种不同的压缩方式，gzip压缩速度最快，历史最久，而且使用也最广泛，bzip2压缩生成的存档文件通常比gzip生成的文件小，但可用性不如gzip广泛，而xz压缩方式相对较新，但通常提供可用方式中最佳的压缩率。
+tar -cvjf /tmp/dir.tar.bz2 /tmp/dir
+	#对/tmp/dir目录打包，并以bzip2方式压缩
+	#j 代表用bzip2压缩，压缩文件以.tar.bz2结尾
+	#J 代表用xz压缩，压缩文件以.tar.xz结尾
+	#z 代表用gzip压缩，压缩文件以.tar.gz结尾
+	 
+提取压缩的tar存档
+tar -xzvf dir.tar.gz 
+	#解压gzip压缩
+tar -xjvf dir.tar.bz2
+	#解压bzip2压缩
+tar -xJvf dir.tar.xz
+	#解压xz
+[root@desktop0 tmp]# tar cvzf test.tar.gz 8.txt 9.txt tar
+8.txt
+9.txt
+tar/
+[root@desktop0 tmp]# ll
+total 16
+-rw-r--r--. 1 root    root    10240 Nov 25 04:25 7.tar
+-rw-r--r--. 1 root    root        0 Nov 25 04:10 7.txt
+-rw-rw-r--. 1 student student     0 Nov 25 04:30 8.txt
+-rw-rw-r--. 1 student student     0 Nov 25 04:30 9.txt
+drwxr-xr-x. 2 root    root        6 Nov 25 04:24 tar
+drwxrwxrwx. 2 student student     6 Nov 25 04:44 tarun
+-rw-r--r--. 1 root    root      163 Nov 25 04:45 test.tar.gz
+[root@desktop0 tmp]# cd tarun/
+[root@desktop0 tarun]# ll
+total 0
+[root@desktop0 tarun]# cd ..
+[root@desktop0 tmp]# tar xvzf test.tar.gz -C ./tarun/
+8.txt
+9.txt
+tar/
+[root@desktop0 tmp]# cd tarun/
+[root@desktop0 tarun]# ll
+total 0
+-rw-rw-r--. 1 student student 0 Nov 25 04:30 8.txt
+-rw-rw-r--. 1 student student 0 Nov 25 04:30 9.txt
+drwxr-xr-x. 2 root    root    6 Nov 25 04:24 tar
+
+
+[jason@desktop0 tmp]$ tar xvzf test.tar.gz -C ./tarun/
+8.txt
+9.txt
+tar/
+[jason@desktop0 tmp]$ cd tarun/
+[jason@desktop0 tarun]$ ll
+total 0
+-rw-rw-r--. 1 jason jason 0 Nov 25 04:30 8.txt
+-rw-rw-r--. 1 jason jason 0 Nov 25 04:30 9.txt
+drwxr-xr-x. 2 jason jason 6 Nov 25 04:24 tar
+ 
+测试功能：
+tar -tjvf /tmp/dir.tar.bz2 
+	#只是测试解压，并没有真的解压
+	#-t 测试 
+tar -czvf /tmp/boot.tar.gz  /boot --exclude=/boot/file
+	#打包压缩时，排除文件/boot/file
+tar -xzvf /tmp/boot.tar.gz boot/file
+	#解压时，我只想解压其中一个文件，不能-C指定解压目录
+ 
+
+
+使用命令将文件复制到远程位置，或从中复制文件SCP
+scp命令可将文件从远程主机传输到本地系统，或者反之，它利用SSH服务器进行身份验证和加密数据传输。
+远程文件系统位置始终以[user@]host:/path格式，无论其为文件传输的来源还是目标位置。user@部分是可选的，如果缺少此部分，则使用调用scp命令的当前用户，在启动传输之前，用户必须通过密码或SSH密钥与SSH服务器进行身份验证。
+scp /etc/yum.conf /etc/hosts server0:/home/student  本地文件复制到远程系统server0上student账户的/home/student/目录中，如果加上user@，文件复制后拥有者变为user
+[root@desktop0 ~]# ll
+total 8528
+-rw-r--r--. 1 student student       0 Nov 24 18:46 4.txt
+[root@desktop0 ~]# scp 4.txt root@server0:/tmp
+root@server0's password: 
+4.txt                                                      100%    0     0.0KB/s   00:00 
+[root@server0 ~]# ll -rt /tmp
+total 75124
+-rw-r--r--.  1 root       root              0 Nov 25 03:34 4.txt
+
+[root@desktop0 ~]# ll
+total 8528
+-rw-r--r--. 1 student student       0 Nov 24 18:46 5.txt
+[root@desktop0 ~]# scp 5.txt server0:/tmp
+root@server0's password: 
+5.txt                                                      100%    0     0.0KB/s   00:00  
+[root@server0 ~]# ll -rt /tmp
+total 75124
+-rw-r--r--.  1 root       root              0 Nov 25 03:37 5.txt
+
+[root@desktop0 ~]# ll
+total 8528
+-rw-r--r--. 1 student student       0 Nov 24 18:46 5.txt
+[root@desktop0 ~]# scp 5.txt jason@server0:/tmp
+jason@server0's password: 
+5.txt          
+
+[root@server0 ~]# ll -rt /tmp
+total 75124
+-rw-r--r--.  1 jason      jason             0 Nov 25 03:40 5.txt
+
+
+[root@desktop0 ~]# scp root@server0:/tmp/5.txt /root
+root@server0's password: 
+5.txt                                                      100%    0     0.0KB/s   00:00    
+[root@desktop0 ~]# ll
+total 8528
+-rw-r--r--. 1 root root       0 Nov 25 03:44 5.txt
+
+
+[root@server0 ~]# ll -rt /tmp
+total 75124
+-rw-r--r--.  1 root       root              0 Nov 25 03:34 4.txt
+-rw-r--r--.  1 jason      jason             0 Nov 25 03:40 5.txt
+-rw-r--r--.  1 student    student           0 Nov 25 04:01 6.txt
+[root@desktop0 ~]# scp jason@server0:/tmp/6.txt /tmp
+jason@server0's password: 
+6.txt                                                      100%    0     0.0KB/s   00:00    
+[root@desktop0 ~]# ll -rt /tmp
+total 0
+-rw-r--r--. 1 root root  0 Nov 25 04:03 6.txt
+
+[root@desktop0 ~]# scp student@server0:/tmp/5.txt /tmp
+student@server0's password: 
+5.txt                                                      100%    0     0.0KB/s   00:00    
+[root@desktop0 ~]# ll -rt /tmp
+total 0
+-rw-r--r--. 1 root root  0 Nov 25 04:03 6.txt
+-rw-r--r--. 1 root root  0 Nov 25 04:04 5.txt
+
+[root@desktop0 ~]# su - student
+Last login: Sun Nov 25 00:49:01 CST 2018 from 172.25.0.250 on pts/0
+[student@desktop0 ~]$ scp student@server0:/tmp/5.txt /tmp
+student@server0's password: 
+5.txt                                                      100%    0     0.0KB/s   00:00    
+[student@desktop0 ~]$ ll -rt /tmp
+total 0
+-rw-r--r--. 1 student student  0 Nov 25 03:52 5.txt
+
+[student@desktop0 ~]$ scp server0:/tmp/5.txt /tmp
+student@server0's password: 
+5.txt                                                      100%    0     0.0KB/s   00:00    
+[student@desktop0 ~]$ ll -rt /tmp
+-rw-r--r--. 1 student student  0 Nov 25 03:54 5.txt
+
+scp server0:/etc//hostname /home/student 将远程计算机上远程账户中的文件复制到本地系统，复制到本地的文件拥有者是当前shell的登录用户
+要以递归方式复制整个目录树，可使用-r选项：scp -r root@server0:/var/log /tmp
+
+使用远程传输文件sftp（yum install vsftpd)
+可以使用sftp命令上传文件到SSH服务器或从中下载文件，sftp命令需要一个[user@]host格式的远程位置，其中user@部分为可选，若缺少此部分，则使用调用sftp命令的用户。sftp会话接受各种命令，如ls，cd,mkdir,rmdir,pwd,此外put和get命令供上传和下载文件使用，使用exit命令退出sftp会话。sftp会话始终假设put命令后跟的是本地文件系统上的文件，并且首先连接用户的主目录。
+ lls查看本地文件 lpwd查看本地路径  l是本地的意思	
+ put/get -p 不改变原来文件属性
+ 
+使用rsync命令同步文件和文件夹
+rsync是在系统间安全复制文件的另一种方式，它与scp的区别在于，如果两个系统间的2个文件或目录相似，rsync仅需要复制系统间的差异部分，而scp则需要复制所有内容。 
+rsync的一个优点是它能够在本地系统和远程系统之间安全而高效地复制文件，虽然首次同步目录的用时与复制操作大致相同，之后的同步都仅需要通过网络复制差异部分。
+rsync的一个最重要选项是-n，用于执行空运行，显示哪些文件将被传输，空运行是对真正执行命令时所发生情况的模拟，它将显示在不使用空运行选项执行命令时将执行的更改。
+[root@desktop0 tmp]# rsync -n /var/log /tmp
+skipping directory log
+[root@desktop0 tmp]# rsync -n /var/log/ /tmp
+skipping directory
+使用rsync同步文件和文件夹时的2个最常用的选项是-a和-v，-v选项会在同步进行时向输出中添加详细信息，而-a则代表存档模式，一次性启用下列选项：
+
+#username只为root时，才可以保持拥有组和拥有者身份。 
+如果一个文件已经传过一次，再传，会增量传输，也就是只会把有差异的内容传到目标位置。
+ 
+同步两个本地目录
+rsync -av /var/log /tmp   #/tmp目录中将创建log目录及其内容
+rsync -av /var/log/ /tmp  #仅同步文件夹的内容而不在目标目录中新建该文件夹，源目录的末尾需要加上一个/，/tmp文件夹中将不创建log目录，仅/var/log/目录的内容同步到/tmp文件夹中
+
+与SCP命令相似，rsync命令也要求使用[user@]host:/path格式指定远程文件系统位置，如果缺少可选的user@部分，则使用调用rsync命令的用户来连接远程位置，远程位置可以用作源，也可以作为目标。若要让rsync同步所传输文件的所有权，必须以root用户身份写入到目标位置。
+rsync -av /var/log student@server0:/tmp
+rsync -av student@server0:/var/log /tmp
+
+实验：P288
+dump备份工具
+1，对目录作备份，但只能做全整备份，不能做差异备份，不支持记录备份时间
+2，对文件系统作备份，支持差异备份，同时可以记录备份的时间
+	#所谓对文件系统备份，就是对一个分区的挂载点作备份
+3，dump不支持xfs文件系统，需要用xfsdump工具，
+[root@server0 ~]# dump -S test
+/dev/vda1: Bad magic number in super-block while opening filesystem
+  DUMP: The ENTIRE dump is aborted.
+[root@server0 ~]# mkdir /back
+[root@server0 ~]# dump -0 -f /back/ba1 test
+  DUMP: Date of this level 0 dump: Thu Nov 22 04:50:10 2018
+  DUMP: Dumping /dev/vda1 (/ (dir root/test)) to /back/ba1
+/dev/vda1: Bad magic number in super-block while opening filesystem
+  DUMP: The ENTIRE dump is aborted.
+[root@server0 ~]# df -Th
+Filesystem     Type      Size  Used Avail Use% Mounted on
+/dev/vda1      xfs        10G  3.1G  7.0G  31% /
+dump命令用于备份ext2或者ext3文件系统。可将目录或整个文件系统备份至指定的设备，或备份成一个大文件。
+
+ 
+什么是差异备份：
+必须有一次全备，也叫0级备份
+1级备份，只针对0级备份有差异的文件作备份
+最多支持9个级别
+
+-0123456789：备份的层级；
+-b<区块大小>：指定区块的大小，单位为KB；
+-B<区块数目>：指定备份卷册的区块数目；
+-c：修改备份磁带预设的密度与容量；
+-d<密度>：设置磁带的密度。单位为BPI；
+-f<设备名称>：指定备份设备；
+-h<层级>：当备份层级等于或大于指定的层级时，将不备份用户标示为“nodump”的文件；
+-n：当备份工作需要管理员介入时，向所有“operator”群组中的使用者发出通知；
+-s<磁带长度>：备份磁带的长度，单位为英尺；
+-T<日期>：指定备份的时间与日期；
+-u：备份完毕后，在/etc/dumpdates中记录备份的文件系统、层级、日期与时间等；
+-w：与-W类似，但仅显示需要备份的文件；
+-W：显示需要备份的文件及其最后一次备份的层级、时间与日期。
+
+对文件系统作备份：
+比如：/tt这个目录是一个分区的挂载点
+yum install -y dump
+dump -S /tt	
+	#测试备份这个文件系统要多大的空间
+	 
+先作一次全备
+dump -0u -f /back /tt 
+	#作一次全备，备份到/back目录
+	#0代表0级别，即全备
+	#u代表记录备份时间
+	#-f 指定备份目标
+	 
+时间记录在哪儿
+cat /etc/dumpdates
+	 
+差异备份
+dump -1u -f /back/dump1 /tt
+	 
+对目录作备份
+只能作0级全备，且不能记录时间
+dump -0 -f /back/ba1 /boot
+ 
+还原备份
+restore
+restore -r -f /back/ba1
+	#-r 读
+	#-f 指定读哪个文件
+注：只能还原到当前目录，所以作还原的时候，一定要记得切换到你想还原的目标目录，会覆盖现有文件
+ 
+上面的方式会还原备份文件里的所有文件，但大多时候，我们只需要还原部分文件
+restore -i -f /back/ba1 
+	#-i进行交互式还原
+restore > ls	
+	#查看备份文件里的内容
+restore >add file	
+	#添加只要还原的文件
+restore >ls	
+	#这时会发现，作了还原的文件前面多了个 *
+restore >delete file 
+	#把上面添加的文件，从要还原的文件中剔除，这时，文件前面的*就没有了
+restore >add file
+restore >extract	
+	#正式还原选中的文件
+	需要指定一个volume
+	 
+dd命令
+使用dd命令新建一个指定大小的文件
+dd if=/dev/zero of=/mnt/file bs=1M count=1
+1+0 records in
+1+0 records out
+1048576 bytes (1.0 MB) copied, 0.0484223 s, 21.7 MB/s
+	#if，表示input file
+	#of，表示output file
+	#bs，指定一个block的大小，如果不指定，默认为512字节（一个扇区大小）
+	#count，指定多少个block
+	#2+0，其中，1表示执行过程中，用了多少个指定大小的block（这里是1M），后面的0表示，没达到指定大小的bs个数
+/dev/zero，是一个输入设备，用它来初始化文件。该设备无穷尽地提供0，可以使用任何你需要的数目——设备提供的要多的多。他可以用于向设备或文件写入字符串0。 
+dd命令也可以用来备份文件
+dd if=/etc/passwd of=/mnt/passwd.back
+1+1 records in
+1+1 records out
+962 bytes (962 B) copied, 0.000175741 s, 5.5 MB/s
+	#这里可以发现，passwd文件有962字节大
+	#没有指定block大小，默认为512字节，而文件有962字节，那就是一个block大小+450字节（不到一个block大小）
+	#1+1，前面的1表示，有一个指定大小的block，后面的1表示，还有一个不够指定大小的block
+	 
+dd if=/mnt/rhel7.iso of=/dev/sdb
+	#使用dd命令刻录ISO文件到光盘
+增加swap分区文件大小
+第一步：创建一个大小为256M的文件：
+#dd if=/dev/zero of=/swapfile bs=1024 count=262144
+第二步：把这个文件变成swap文件：
+#mkswap /swapfile
+第三步：启用这个swap文件：
+#swapon /swapfile
+第四步：编辑/etc/fstab文件，使在每次开机时自动加载swap文件：
+/swapfile    swap    swap    default   0 0
+
+
+
+
+
+
+
+
+			
+
