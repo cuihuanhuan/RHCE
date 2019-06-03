@@ -1,0 +1,1483 @@
+Linux，我们称之为类unix，意思是说风格类似unix 
+unix分为两大类：
+(1)system(贝尔实验室)
+	AIX (IBM)
+	solaris (SUN)
+	HP-UX (HP)
+(2)BSD（加州大学伯克利分校）
+	NetBSD
+	OpenBSD
+	FreeBSD
+	 
+linux发行版本：
+(1)slackware
+二次发行版：suse
+(2)debian
+二次发行版：ubuntu
+三次发行版：mint
+(3)redhat（RHEL、fedora）
+二次发行版：centos
+ 
+linux内核
+Linux内核[kernel]是整个操作系统的最底层，它负责整个硬件的驱动，以及提供各种系统所需的核心功能，包括防火墙机制、是否支持LVM或Quota等文件系统等等，如果内核不认识某个最新的硬件，那么硬件也就无法被驱动，你也就无法使用该硬件。计算机真正工作的东西其实是硬件，例如数值运算要使用到CPU、数据储存要使用到硬盘、图形显示会用到显示适配器、音乐发声要有音效芯片、连接Internet 可能需要网络卡等等。内核就是控制这些芯片如何工作。操作系统是一个用来和硬件打交道并为用户程序提供一个有限服务集的低级支撑软件。一个计算机系统是一个硬件和软件的共生体，它们互相依赖，不可分割。计算机的硬件，含有外围设备、处理器、内存、硬盘和其他的电子设备组成计算机的发动机。但是没有软件来操作和控制它，自身是不能工作的。完成这个控制工作的软件就称为操作系统，在Linux的术语中被称为“内核”，也可以称为“核心”。Linux内核的主要模块(或组件)分以下几个部分：存储管理、CPU和进程管理、文件系统、设备管理和驱动、网络通信，以及系统的初始化(引导)、系统调用等。
+
+查看linux内核版本的命令：
+uname -a
+uname -r
+#注意：linux版本号主要看主版本号和次版本号，次版本号为偶数，表示稳定版，奇数，表示测试版
+ 
+linux基于模块化，比如：驱动当作一个模块的方式加载
+lsmod |grep -i usb_storage #lsmod命令用于显示已经加载到内核中的模块的状态信息
+可以发现，默认没有加载usb驱动，当插入一个U盘，就自动加载了
+rpm -qa | grep -i xorg-x11  #查看是否安装了图形化界面
+
+ 
+Bash shell
+一个命令行是基于文本的界面，可用于向计算机系统输入指令。Linux命令行由一个程序提供，称它为shell。
+如果以交互式使用shell，它在等待用户输入命令时显示一个字符串，这称为shell提示符。普通用户启动shell时，默认提示符的结尾是$字符：[student@server0 ~]$，如果以超级用户root运行shell，则$替换为#：[root@server0 ~]#，当打开一个终端就打开一个shell，得到一个命令行界面，就触发一个shell ，触发一个shell，可以得到一个提示符：登陆用户名@主机名 当前目录，方括号里的提示符是由PS1变量提供。
+PS1是主提示符变量,也是默认提示符变量。默认值"\s-\v\$“，显示shell类型和版本。 
+基本上通过设置PS1来定义命令行提示字符即可，最常用的需求就是显示登录的用户名、主目录、主机名等等，举个例子如下：
+显示用户名，主机名和动态显示当前目录 
+-bash-3.00# export PS1="[\u@\h \w]" 
+[root@MagicLinux ~]cd /etc 
+[root@MagicLinux /etc]
+注意：如果当前目录是用户的HOME目录，则显示＂~＂
+PS1变量可以使用的参数值有如下：
+\d	代表日期，格式为weekday month date，例如："Mon Aug 1"
+\H	完整的主机名称。例如：我的机器名称为：fc4.linux，则这个名称就是fc4.linux
+\h	仅取主机的第一个名字，如上例，则为fc4，.linux则被省略
+\t	显示时间为24小时格式，如：HH：MM：SS
+\T	显示时间为12小时格式
+\A	显示时间为24小时格式：HH：MM
+\u	当前用户的账号名称
+\v	BASH的版本信息
+\w	完整的工作目录名称。家目录会以 ~代替   PS1="[\u@\h \w]\$"
+\W	利用basename取得工作目录名称，所以只会列出最后一个目录
+\#	下达的第几个命令
+\$	提示字符，如果是root时，提示符为：# ，普通用户则为：$
+\[	字符"["
+\]	字符"]"
+\!	命令行动态统计历史命令次数
+因为内核不提供和用户的交互功能，所以需要一个程序提供这种功能，这种程序分为两种：命令行（CLI）和图形界面（GUI），在linux提供CLI的交互程序，我们称为shell 。
+
+cat /etc/shells   #可以看到多种shell，对于红帽系统来说，默认采用的是bash这个shell
+/bin/sh
+/bin/bash
+/sbin/nologin
+/usr/bin/sh
+/usr/bin/bash
+/usr/sbin/nologin
+/bin/tcsh
+/bin/csh
+	 
+chsh -l
+#查看系统所有shell
+	 
+echo $SHELL
+#查看当前使用的shell
+ps
+#ps命令用于查看当前进程，可以发现，有一个bash进程
+
+echo $PS1
+#查看命令提示符的格式
+默认的PS1="[\u@\h \W]\$"，其中\W就是路径的设置选项，大写的W是简洁模式，小写的w为全路径模式。
+
+echo $$
+#查看当前shell的ID
+ 
+终端
+物理终端：一个键盘、一个鼠标、一个显示器就是一个物理终端
+设备文件：/dev/console
+ 
+虚拟终端（tty）：附加在物理终端之上，以软件方式虚拟出来的终端
+	设备文件：/dev/tty*
+	 
+模拟终端(pts)：纯软件实现的终端，比如：在图形界面下打开的terminal，使用SSH、telnet等远程打开的界面。
+	设备文件：/dev/pts/*
+ 
+系统启动过程中，以物理终端提供
+系统启动之后，就以虚拟终端提供
+ 
+虚拟终端切换
+ctrl+alt+f键
+如果有图形环境，共有6个控制台，图形界面运行在第一个；文本界面运行在第二至第六个。
+如果没有图形环境，则只有5个虚拟控制台，全是文本界面。
+提示：rhel5之前的版本，都有7个虚拟控制台，前6个为文本界面，第7个为图形界面
+ 
+tty
+#查看当前终端设备
+who
+#查看有哪些用户登陆到当前系统
+last
+#用于显示用户最近登录信息。单独执行last命令，它会读取/var/log/wtmp的文件，并把该给文件的内容记录的登入系统的用户名单全部显示出来。
+lastlog
+查看机器最近成功登陆的事件和最后一次不成功的登陆事件，对应日志“/var/log/lastlog”
+ac -dp
+查看机器所有用户的连接时间（小时），对应日志文件“/var/log/wtmp”
+echo aaaaaa > /dev/tty2
+#就会在tty2上显示这串字符
+echo hello > /dev/pts/5
+#在pts5上显示hello
+ 
+Shell 基础知识
+命令 【选项】 【参数】
+命令：（需要运行）
+	所谓命令就是一个可执行文件，文件本身包含了可执行的程序代码
+	输入命令，并回车，就是将这个程序提交给内核，由内核分配资源将其运行起来。运行中的程序，我们称为进程。
+	最左边，必须是一个命令
+选项：（用于调整命令的行为）
+	用于启用或关闭命令的某个或某些功能
+	短选项：-表示，可合并使用
+	长选项：--表示，一般不可合并使用
+参数：（命令的目标）
+	命令作用的对象，向命令提供数据。
+ 
+注意：
+1.命令，选项，参数中间使用空格隔开
+2.多长选项之间、多参数之间，使用空格隔开
+3.一行执行多个命令，使用分号;隔开
+
+要有效地使用命令，用户需要了解命令接受的选项和参数，以及他们正确的排列顺序。大多数命令都包含--help选项，或者使用man 命令，这可使命令打印其作用的说明，即介绍命令的语法、其接受的选项列表及其作用的“用法语句”
+.方括号[ ]括起的是可选项目
+. …前面的任何内容均表示该类型项目的任意长度列表
+.以竖线|分隔的多个项目表示只能指定其中一个项目
+.尖括号<>中的文本表示变量数据
+ 
+在shell中有两类命令：
+内部命令实际上是shell程序的一部分，其中包含的是一些比较简单的linux系统命令，这些命令由shell程序识别并在shell程序内部完成运行，通常在linux系统加载运行时shell就被加载并驻留在系统内存中。内部命令是写在bashy源码里面的，其执行速度比外部命令快，因为解析内部命令shell不需要创建子进程。比如：exit，history，cd，echo等。
+
+外部命令是linux系统中的实用程序部分，因为实用程序的功能通常都比较强大，所以其包含的程序量也会很大，在系统加载时并不随系统一起被加载到内存中，而是在需要时才将其调用内存。通常外部命令的实体并不包含在shell中，但是其命令执行过程是由shell程序控制的。shell程序管理外部命令执行的路径查找、加载存放，并控制命令的执行。外部命令是在bash之外额外安装的，通常放在/bin，/usr/bin，/sbin，/usr/sbin......等等。可通过“echo $PATH”命令查看外部命令的	存储路径，比如：ls、vi等。
+ 
+type cd
+#查看一个命令的类型，是内建还是外部
+which ls
+#查找ls命令可执行文件在哪儿 
+whereis ls
+#查找关键字文件在哪儿
+ 
+
+echo $PATH
+#查看PATH变量的值
+#执行命令时，就会在这个PATH变量指定的路径，从左到右去寻找，一直到找到为止，如果没找到，会提示找不到这个命令
+#shell搜寻到的外部命令的路径，会被缓存下来，下次就不用再去搜了。
+
+echo -n 不换行输出
+[root@abin ~]# echo -n '123';echo '456'
+123456
+[root@abin ~]# echo '123';echo '456'
+123
+456
+
+echo -e 处理特殊字符
+若字符串中出现以下字符，则特别加以处理，而不会将它当成一般文字输出： 
+\a 发出警告声； 
+\b 删除前一个字符； 
+\c 最后不加上换行符号； 
+\f 换行但光标仍旧停留在原来的位置； 
+\n 换行且光标移至行首； 
+\r 光标移至行首，但不换行； 
+\t 插入tab； 
+\v 与\f相同； 
+\ 插入\字符； 
+\nnn 插入nnn（八进制）所代表的ASCII字符；
+[root@abin ~]# echo -e '\a'
+
+[root@abin ~]# echo -e 'a\bbbbb'
+bbbb
+[root@abin ~]# echo -e 'a\nbbbbb'
+a
+bbbbb
+ 
+hash
+#查看缓存的命令
+#hits，表示命中次数，也就是被执行了多少次。
+ 
+hash -r
+#清除所有缓存
+#比如：将ls程序文件移到/usr/bin目录下，如果有缓存存在，还会到/bin/下去找ls这个命令，找不到就会报错，这时，就需要清一下缓存，重新去搜寻。
+
+当用户使用完shell并希望退出时，可以通过多种方式结束会话。exit命令终止当前shell的会话，另一种结束会话的方式是按下ctrl+d。
+ 
+使用Bash Shell执行命令
+键入到shell中的每个字符串最多有3个部分：命令、选项（以-或者--开头）、参数。键入到shell中的每个词语通过空格相互隔开。用户准备好执行命令时，按下enter键。每一命令在单独的一行中键入，系统会显示各个命令的输出，然后再显示shell提示符。如果用户希望在一行中键入多个命令，则可以使用分号；作为命令分隔符。
+shutdown
+1.作用
+shutdown命令的作用是关闭计算机，它的使用权限是超级用户。
+2.格式
+shutdown [－h][－i][－k][－m][－t]
+3.重要参数
+－t：在改变到其它运行级别之前，告诉init程序多久以后关机。
+－k：并不真正关机，只是送警告信号给每位登录者。
+－h：关机后关闭电源。 shutdown -h now 
+－c：cancel current process取消目前正在执行的关机程序。所以这个选项当然没有时间参数，但是可以输入一个用来解释的讯息，而这信息将会送到每位使用者。
+－F：在重启计算机时强迫fsck。
+－time：设定关机前的时间。
+－m: 将系统改为单用户模式。
+－i：关机时显示系统信息。
+4.命令说明
+	shutdown命令可以安全地将系统关机。有些用户会使用直接断掉电源的方式来关闭Linux系统，这是十分危险的。因为Linux与Windows不同，其后台运行着许多进程，所以强制关机可能会导致进程的数据丢失，使系统处于不稳定的状态，甚至在有的系统中会损坏硬件设备（硬盘）。在系统关机前使用 shutdown命令，系统管理员会通知所有登录的用户系统将要关闭，并且login指令会被冻结，即新的用户不能再登录。
+5.举例
+shutdown -h 3:40
+说明 3：40开始关机。
+	 
+halt
+1.作用
+halt命令的作用是关闭系统，它的使用权限是超级用户。
+2.格式
+halt [－n] [－w] [－d] [－f] [－i] [－p]
+3.主要参数说明
+－n：防止sync系统调用，它用在用fsck修补根分区之后，以阻止内核用老版本的超级块覆盖修补过的超级块。
+－w：并不是真正的重启或关机,只是写wtmp（/var/log/wtmp）纪录。
+－f：没有调用shutdown，而强制关机或重启。
+－i：关机（或重启）前，关掉所有的网络接口。
+－f：强迫关机，不呼叫shutdown这个指令。
+－p: 当关机的时候顺便做关闭电源的动作。
+－d：关闭系统，但不留下纪录。 
+4.命令说明
+	halt就是调用shutdown -h。halt执行时，杀死应用进程，执行sync(将存于buffer中的资料强制写入硬盘中)系统调用，文件系统写操作完成后就会停止内核。若系统的运行级别为0或6，则关闭系统；否则以shutdown指令（加上－h参数）来取代。 
+ 
+reboot
+1.作用
+reboot命令的作用是重新启动计算机，它的使用权限是系统管理者。
+2.格式
+reboot [－n] [－w] [－d] [－f] [－i]
+3.主要参数
+－n: 在重开机前不做将记忆体资料写回硬盘的动作。
+－w: 并不会真的重开机，只是把记录写到/var/log/wtmp文件里。
+－d: 不把记录写到/var/log/wtmp文件里（－n这个参数包含了－d）。
+－i: 在重开机之前先把所有与网络相关的装置停止。
+ 
+exit
+1.作用
+exit命令的作用是退出系统，它的使用权限是所有用户。
+2.格式
+exit
+3.参数
+exit命令没有参数，运行后退出系统进入登录界面。
+ 
+last
+1.作用
+last命令的作用是显示近期用户或终端的登录情况，它的使用权限是所有用户。通过last命
+令查看该程序的log，管理员可以获知谁曾经或企图连接系统。
+2.格式
+1ast[—n][－f file][－t tty] [—h 节点][－I —IP][—1][－y][1D]
+3.主要参数
+－n：指定输出记录的条数。
+－f file：指定用文件file作为查询用的log文件。
+－t tty：只显示指定的虚拟控制台上登录情况。
+－h 节点：只显示指定的节点上的登录情况。
+－i IP：只显示指定的IP上登录的情况。
+－1：用IP来显示远端地址。
+－y：显示记录的年、月、日。
+－ID：知道查询的用户名。
+－x:显示系统关闭、用户登录和退出的历史。
+ 
+id 
+#查看当前用户
+hostname 
+#查看当前主机名 
+pwd 
+#查看当前路径
+date
+#查看日期时间
+cal 2016
+#查看2016年的日历
+bc
+#计算器
+
+date命令用于显示当前日期和时间，超级用户也可以用它来设置系统时钟，以+加号开头的参数可指定日期命令的格式字符串。
+Linux date 格式化时间和日期
+[root@linuxidc ~]# date  +"%Y-%m-%d"  
+2016-11-26
+[root@linuxidc ~]# date  +"%Y_%-m_%-d"
+2008_5_7 
+[root@linuxidc ~]# date +"%Y-%m-%d %T"
+2016-11-26 11:55:19 
+[root@linuxidc ~]# date  +"%Y-%m-%d %H:%M"
+2016-11-26 11:55 
+[root@linuxidc ~]# date  +"%Y-%m-%d %H:%M:%S"
+2016-11-26 11:55:57
+ 
+在Linux Shell编程中，经常用到日期的加减运算
+date +%Y%m%d --date="-1 day"
+date 用法： date [OPTION]... [+FORMAT]
+date [-u|--utc|--universal] [MMDDhhmm[[CC]YY][.ss]]
+date 可以用来显示或设定系统的日期与时间。
+1.在显示方面，使用者可以设定欲显示的格式，格式设定为一个加号后接数个标记，其中可用的标记列表如下: % :  打印出 %
+%n : 下一行
+%t : 跳格
+%H : 小时(00..23)
+%I : 小时(01..12)
+%k : 小时(0..23)
+%l : 小时(1..12)
+%M : 分钟(00..59)
+%p : 显示本地 AM 或 PM
+%r : 直接显示时间 (12 小时制，格式为 hh:mm:ss [AP]M)
+%s : 从 1970 年 1 月 1 日 00:00:00 UTC 到目前为止的秒数
+%S : 秒(00..61)
+%T : 直接显示时间 (24 小时制)
+%X : 相当于 %H:%M:%S
+%Z : 显示时区 %a : 星期几 (Sun..Sat)
+%A : 星期几 (Sunday..Saturday)
+%b : 月份 (Jan..Dec)
+%B : 月份 (January..December)
+%c : 直接显示日期与时间
+%d : 日 (01..31)
+%D : 直接显示日期 (mm/dd/yy)
+%h : 同 %b
+%j : 一年中的第几天 (001..366)
+%m : 月份 (01..12)
+%U : 一年中的第几周 (00..53) (以 Sunday 为一周的第一天的情形)
+%w : 一周中的第几天 (0..6)
+%W : 一年中的第几周 (00..53) (以 Monday 为一周的第一天的情形)
+%x : 直接显示日期 (mm/dd/yy)
+%y : 年份的最后两位数字 (00.99)
+%Y : 完整年份 (0000..9999)
+2.在设定时间方面
+date -s //设置当前时间，只有root权限才能设置，其他只能查看。
+date -s 200161123 //设置成200161123，这样会把具体时间设置成空00:00:00
+date -s 01:01:01 //设置具体时间，不会对日期做更改
+date -s “01:01:01 2016-11-23″ //这样可以设置全部时间
+date -s “01:01:01 200161123″ //这样可以设置全部时间
+date -s “2016-11-23 01:01:01″ //这样可以设置全部时间
+date -s “200161123 01:01:01″ //这样可以设置全部时间
+3.加减
+date +%Y%m%d        //显示前天年月日
+date +%Y%m%d --date="+1 day"  //显示前一天的日期
+date +%Y%m%d --date="-1 day"  //显示后一天的日期
+date +%Y%m%d --date="-1 month"  //显示上一月的日期
+date +%Y%m%d --date="+1 month"  //显示下一月的日期
+date +%Y%m%d --date="-1 year"  //显示前一年的日期
+date +%Y%m%d --date="+1 year"  //显示下一年的日期
+
+passwd命令更改用户自己的密码，必须指定该账户的原始密码，之后才能允许进行修改。默认情况下，passwd配置为强密码，其包含小写字母、大写字母、数字和符号，并且不以字典中的单词为基础。超级用户root可以使用passwd命令更改其他用户密码，也可以使用如下命令更改密码：echo 'abcd123' | passwd --stdin tony
+
+Linux不需要文件扩展名来根据类型分类文件。file命令可以扫描文件内容开头，显示该文件的类型。
+file /etc/passwd
+
+head和tail命令分别显示文件的开头和结尾部分。默认情况下，这2个命令显示10行，但他们都有一个参数-n选项，允许指定不同的行数。
+tail -n 5 /etc/passwd=tail -5 /etc/passwd
+head -n 5 /etc/passwd=head -5 /etc/passwd
+tail -f 实时查看日志文件 tail -f 日志文件log，按ctrl+c 退出
+
+wc命令可计算文件中的行、字和字符的数量。它可以接受-l,-w或-c选项，分别用于仅显示行数、字数或者字符数。
+
+ls命令最基本的形式会显示当前目录下的文件和目录，ls命令的输出列表是按字母排序的，如果用户用的是支持彩色的终端仿真器，ls命令还可以用不同的颜色来区分不同类型的文件。
+ls -F命令轻松区分文件和目录，-F参数在目录名后加了正斜线/，在可执行文件后面加了*星号
+ls -a可以显示以.开头的隐藏文件
+ls -R递归选项，列出当前目录下包含的子目录中的文件
+ls -l=ll长列表格式输出，包含了目录中每个文件的更多相关信息：
+1、文件类型，比如目录d，文件-，字符型文件c或块设备b
+2、文件权限
+3、文件的硬链接总数
+4、文件属主的用户名
+5、文件属组的组名
+6、文件的大小，以字节为单位
+7、文件的上次修改时间
+8、文件名或目录名
+ls还可以过滤输出列表，问号？代表一个字符，星号*代表0个或者多个字符。
+touch创建空文件，并将你的用户名作为文件的属主，注意，文件大小为0.touch命令还可以用来改变文件的修改时间，这个操作并不需要改变文件的内容。如果只想改变访问时间，可用-a参数：ls -l --time=atime file
+cp复制文件 cp source destination，当source和destination参数都是文件名时，cp命令将源文件复制成一个新文件，并且以destination命名，新文件就像全新的文件一样，有新的修改时间。如果目标文件已经存在，cp命令可能不会提醒，可以加上-i选项，强制shell询问是否覆盖已有文件。cp -R可以在一条命令中递归地复制整个目录内容。
+重命名文件称为移动（moving），mv命令可以将文件和目录移动到另一个位置或者重新命名。mv只影响文件名，inode号和时间戳保持不变。（文件数据都储存在"块"中，那么很显然，我们还必须找到一个地方储存文件的元信息，比如文件的创建者、文件的创建日期、文件的大小等等。这种储存文件元信息的区域就叫做inode，中文译名为"索引节点"，使用stat filename查看）mv也可以加-i参数，在覆盖已有文件时给出提示。
+linux中，删除叫作移除，bash shell中删除文件的命令是rm，rm -i参数提示是不是要真的删除该文件，bash shell中没有回收站或垃圾箱，文件一旦删除，就无法找回。-f参数强制删除，尤其是rm -rf *要慎用
+mkdir创建目录，-p同时创建多个目录和子目录，会根据需要创建缺失的父目录。
+rmdir只删除空目录，-r（-R）选项使得命令可以向下进入目录，删除其中的文件，然后再删除目录本身。
+cat命令可显示文件中的所有数据，-n会给所有行加上行号（nl file），-b可以给有文本的行加上行号；-T不显示制表符
+more命令可以显示文本文件内容，但会在显示每页数据后停下来。more命令时分页显示工具，可以用过空格键或者回车键以逐行向前的方式浏览文本文件，按q退出
+less命令能够实现文本文件的前后翻动，而且还有一些高级搜索功能，less命令的操作和more命令基本一样，一次显示一屏的文本文件，less还能识别上下键和上下翻页键。
+
+TAB补全
+命令：yum install bash-completion，安装完成后生效，按下Tab键补全命令
+输入命令、选项、参数时，可以通过tab键补全功能来减轻输入压力。键入的内容如果足够使其唯一，按一次tab键即可补全，如果键入的内容不够使其唯一，按两次tab键，即可以显示以键入的字符为开头的所有命令。
+在RHEL7/CentOS7以前的版本中，bash自动补全功能仅限于命令和文件名，然而网络设备往往可以自动补全命令的参数，常常让搞网络出身的工程师唏嘘不已。
+在新出的RHEL7/CentOS7中的Bash已经可以自动补全命令参数了，需要注意的是RHEL7/CentOS7的默认安装类型是最小安装，它是没有这个功能的。要启用这个功能，你需要安装一个bash-completion包，然后退出bash，重新登录即可（未重启bash的情况下继续使用可能出现补全功能异常，出现一堆代码）。
+bash-2.05及以后的版本提供了自动补齐的编程接口，通过安装 bash-completion 来使用TAB键自动补齐几乎任何内容，包括参数、文件、目录甚至包名称等等。
+	 
+rpm -qa |grep bash-completion
+ 
+命令历史记录
+history命令显示之前执行的命令列表，带有命令编号作为前缀
+在每个用户的家目录，都有自己的历史记录文件:.bash_history
+登陆shell时，会从登陆用户的家目录中，读取.bash_history文件。
+登陆后，执行的命令历史记录，会先记录到缓存中
+登出时，会将缓存中的历史记录，以追加方式写到.bash_history文件中。
+ 
+vim /root/.bash_history
+ 
+history
+#查看历史命令记录
+history -a
+#立即将缓存中的记录，写回文件
+history -c 
+#清除历史
+	 
+echo $HISTSIZE
+#查看命令历史记录的条数
+echo $HISTFILE
+#历史文件路径
+echo $HISTFILESIZE
+#命令历史文件记录历史的条数
+echo $HISTCONTROL
+#历史记录的控制
+#ignoredups，忽略连续且相同的重复的命令
+#ignorespace，忽略所有以空白开头的命令
+#ignoreboth，上面两项全部
+ 
+感叹号！是元字符，用于扩展之前的命令而不必重新键入它们 
+!数字
+#调用历史记录中对应编号的命令
+!字符串
+#调用历史记录中最近的一个以指定字符串开头的命令。 
+!!
+#调用上一条命令
+!$
+#表示上一个命令的最后一段字符
+
+方向键可用于shell历史记录中的之前命令行之间导航，向上箭头编辑历史记录列表中的上一个命令，向下箭头编辑历史记录中的下一个命令，向左箭头和向右箭头可在当前编辑的命令行中向左向右移动光标。
+上、下箭头
+#可以上下查阅历史记录
+左、右箭头
+#在当前命令行中左右移动光标
+esc+.
+#将上一命令的最后一个参数复制到当前命令行光标处，重复使用，将继续到更早的命令。
+alt+.
+#将上一个命令的最后一段字符复制到当前，重复使用。
+ctrl+r
+#在历史记录列表中搜索某一模式的命令
+	 
+编辑命令行-快捷键
+交互使用时，bash具有命令行编辑功能，这允许用户使用文本编辑器命令在当前键入的命令内移动并进行修改。
+ctrl+a
+光标定位到命令行首
+ctrl+e
+光标定位到命令行尾
+ctrl+u
+将光标处前面的内容清除
+ctrl+k
+将光标处后面的内容清除
+ctrl+左箭头
+跳到命令行中前一字的开头
+ctrl+右箭头
+跳到命令行中下一字的末尾
+ctrl+c
+截断进程
+ctrl+l=clear
+清空屏幕
+
+bash shell用一个叫作环境变量（environment variable）的特性来存储有关shell会话和工作环境的信息。在bash shell中，环境变量分为：全局变量和局部变量。
+全局环境变量对于shell会话和所有生成的子shell都是可见的，局部变量则只对创建它们的shell可见。
+系统环境变量基本上都是使用全大写字母，以区别于普通用户的环境变量。
+[root@abin ~]# env
+XDG_SESSION_ID=1
+HOSTNAME=abin.linux
+SELINUX_ROLE_REQUESTED=
+TERM=xterm
+SHELL=/bin/bash
+HISTSIZE=1000
+SSH_CLIENT=192.168.88.1 49321 22
+SELINUX_USE_CURRENT_RANGE=
+SSH_TTY=/dev/pts/0
+USER=root
+….
+要显示个别环境变量的值，可以使用printenv，不要使用env命令。
+[root@abin ~]# printenv HOME
+/root
+[root@abin ~]# env HOME
+env: HOME: No such file or directory
+[root@abin ~]# echo $HOME
+/root
+[root@abin ~]# ls $HOME  在变量名前加上$不仅能显示当前变量的值，还能让变量作为命令行参数。
+12  anaconda-ks.cfg  test  test1  test2
+[root@abin ~]# bash
+[root@abin ~]# ps -f
+UID         PID   PPID  C STIME TTY          TIME CMD
+root       1518   1514  0 18:55 pts/0    00:00:00 -bash
+root       1563   1518  0 19:09 pts/0    00:00:00 bash
+root       1576   1563  0 19:09 pts/0    00:00:00 ps -f
+[root@abin ~]# echo $HOME
+/root
+
+局部环境变量只能在定义它们的进程中可见，尽管它们是局部的，但是和全局环境变量一样重要，Linux系统也默认定义了标准的局部环境变量，用户也可以自己定义自己的局部变量。
+Linux系统中并没有一个只显示局部环境变量的命令，set命令会显示某个特定进行设置的所有环境变量，包括局部变量、全局变量以及用户定义变量。还会按照字母顺序对结果进行排序。env和printenv命令同set命令的区别在于前2个命令不会对变量排序，也不会输出局部变量和用户自定义变量。
+
+设置局部用户定义变量
+[root@abin ~]# var1=hello world   要赋值一个含有空格的字符串值，必须要用引号
+-bash: world: command not found
+[root@abin ~]# var1 = hello world 变量，等号和值之间没有空格，如果加上空格，bash shell就会把值当做一个单独命令
+-bash: var1: command not found
+[root@abin ~]# var1="hello world"
+[root@abin ~]# echo $var1
+hello world
+[root@abin ~]# bash
+[root@abin ~]# echo $var1 子shell无法使用用户定义变量
+
+[root@abin ~]# exit
+exit
+[root@abin ~]# echo $var1
+hello world
+类似地，如果你在子进程中设置了一个局部变量，那么一旦退出子进程，局部环境变量就不可用。
+[root@abin ~]# echo $var2
+
+[root@abin ~]# bash
+[root@abin ~]# var2="welcome"
+[root@abin ~]# echo $var2
+welcome
+[root@abin ~]# exit
+exit
+[root@abin ~]# echo $var2
+
+设置全局环境变量
+在设定全局环境变量的进程所创建的子进程中，该变量都是可见的，创建全局环境变量的方法是先创建一个局部变量，然后再把它导出到全局环境中。
+[root@abin ~]# var1="hello world"
+[root@abin ~]# export var1
+[root@abin ~]# echo $var1
+hello world
+[root@abin ~]# bash
+[root@abin ~]# echo $var1
+hello world
+[root@abin ~]# exit
+exit
+修改(删除）子shell中全局环境变量并不会影响到父shell中该变量的值，仅在shell中生效，并不会反映到父shell中。
+[root@abin ~]# var1="hello world"
+[root@abin ~]# export var1
+[root@abin ~]# echo $var1
+hello world
+[root@abin ~]# bash
+[root@abin ~]# echo $var1
+hello world
+[root@abin ~]# var1=null
+[root@abin ~]# echo $var1
+null
+[root@abin ~]# exit
+exit
+[root@abin ~]# echo $var1
+hello world
+子shell也无法使用export命令改变父shell中全局环境变量的值
+[root@abin ~]# echo $var1
+hello world
+[root@abin ~]# bash
+[root@abin ~]# echo $var1
+hello world
+[root@abin ~]# var1=null
+[root@abin ~]# echo $var1
+null
+[root@abin ~]# export var1
+[root@abin ~]# echo $var1
+null
+[root@abin ~]# exit
+exit
+[root@abin ~]# echo $var1
+hello world
+
+使用unset命令删除环境变量
+[root@abin ~]# echo $var1   如果要用到变量，使用$
+hello world
+[root@abin ~]# unset var1   如果要操作变量，就不加$
+[root@abin ~]# echo $var1
+
+默认的shell环境变量
+HOME 当前用户的主目录
+PATH shell查找命令的目录列表，用冒号分隔
+PS1 shell命令行界面的主提示符
+[root@abin ~]# echo $PS1
+[\u@\h \W]\$
+[root@abin ~]# PS1='[\u@\h \w]\$'
+[root@abin ~]#echo $PS1
+[\u@\h \w]\$
+[root@abin ~]#export PS1
+[root@abin ~]#bash
+[root@abin ~]#cd /home
+[root@abin /home]#pd
+bash: pd: command not found
+[root@abin /home]#pwd
+/home
+[root@abin /home]#exit
+exit
+[root@abin ~]# echo $PS1 退出终端再进来即失效
+[\u@\h \W]\$
+BASH 当前shell实例的全路径名
+PPID bash shell父进程的PID
+PWD 当前工作目录
+OLDPWD shell之前的工作目录
+LANG shell的语言环境类别
+SHELL bash shell的全路径名
+UID  当前用户的真实用户ID
+
+设置PATH环境变量
+当你在shell命令行界面中输入一个外部命令时，shell必须搜索系统来找到对应的程序，PATH环境变量定义了用于进行命令和程序查找的目录。
+[root@abin ~]# echo $PATH
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin  各个目录之间用冒号分隔
+如果命令或程序的位置没有包括在PATH变量中，那么如果不使用绝对路径的话，shell是没法找到的。
+[root@abin ~]# vim test1 
+[root@abin ~]# cat test1 
+#!/bin/bash 
+for i in `seq 1 5`
+do
+	echo $i
+done
+[root@abin ~]# test1
+-bash: test1: command not found
+[root@abin ~]# /root/test1 
+1
+2
+3
+4
+5
+[root@abin ~]# ./test1
+1
+2
+3
+4
+5
+[root@abin ~]# test1
+-bash: test1: command not found
+[root@abin ~]# PATH=$PATH:/root
+[root@abin ~]# echo $PATH
+/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/root/bin:/root
+[root@abin ~]# test1
+1
+2
+3
+4
+5
+
+当登录Linux后启动一个bash shell时，默认情况下bash会在几个文件中查找命令，这些文件叫作启动文件或环境文件，bash检查的启动文件取决于你启动bash shell的方式，启动bash shell有3种方法：
+1、登录时作为默认登录shell   2、作为非登录shell的交互式shell  3、作为运行脚本的非交互shell
+登录shell会从5个不同的启动文件里读取命令：
+/etc/profile  $HOME/.bash_profile    $HOME/.bashrc   $HOME/.bash_login   $HOME/.profile
+/etc/profile文件是系统上默认的bash shell的主启动文件，系统上的每个用户登录时都会执行这个启动文件。
+另外4个启动文件是针对用户的（大多数版本Linux只用到其中1-2个），提供一个用户专属的启动文件来定义该用户所用到的环境变量，4个都是以点开头，说明它们是隐藏文件，每个用户都可以编辑这些文件并添加自己的环境变量，这些环境变量会在每次启动bash shell会话时生效。
+shell会按照以下顺序，运行第一个被找到的文件，余下的被忽略：
+$HOME/.bash_profile 
+该启动文件会先去检查HOME目录下是不是还有一个叫.bashrc的启动文件，如果有，会先执行启动文件里面的命令
+[root@abin pengwb]# cat .bash_profile 
+# .bash_profile
+
+# Get the aliases and functions
+if [ -f ~/.bashrc ]; then
+	. ~/.bashrc
+fi
+
+$HOME/.bash_login
+$HOME/.profile
+
+如果bash shell不是登录系统时启动的，比如是在命令行提示符下敲入的bash启动，那么叫作交互式shell。如果是交互式shell，它就不会去访问/etc/profile，只会检查用户HOME目录中的.bashrc文件.
+[root@abin pengwb]# cat .bashrc 
+# .bashrc
+
+# Source global definitions
+if [ -f /etc/bashrc ]; then
+	. /etc/bashrc
+fi
+该文件有2个作用，一是查看/etc目录下通用bashrc文件，二是为用户提供一个定制自己的命令别名。
+
+系统执行shell脚本时用的shell就是非交互式shell，不同的地方是在于它没有命令行提示符。为了处理这种情况，bash shell提供了BASH_ENV环境变量，当shell启动一个非交互式shell进程时，它会检查这个环境变量来查看要执行的启动文件，如果有指定文件，shell会执行该文件里的命令，这通常包括shell脚本变量设置。对于那些不启动子shell的脚本，变量已经存在于当前shell中，所以就算没有设置BASH_ENV，也可以使用当前shell的局部变量和全局变量。
+
+对于全局环境变量来说，Linux系统中所有用户都需要使用的变量，可能更倾向于将新的或修改过的变量设置放在/etc/profile文件中，但这可不是什么好主意，如果你升级了所用的发行版，这个文件也会跟着更新，那你所有定制过的变量设置可就都没有了，最好是在/etc/profile.d目录中创建一个以.sh结尾的文件，把所有新的或修改过的全局环境变量放在这个文件中。存储个人用户永久性bash shell变量的地方是$HOME/.bashrc文件。
+
+
+
+Linux中环境变量包括系统级和用户级，系统级的环境变量是每个登录到系统的用户都要读取的系统变量，而用户级的环境变量则是该用户使用系统时加载的环境变量。 
+所以管理环境变量的文件也分为系统级和用户级的.
+1.系统级：
+（1）/etc/environment: 是系统在登录时读取的第一个文件，用于为所有进程设置环境变量。系统使用此文件时并不是执行此文件中的命令，而是根据KEY=VALUE模式的代码，对KEY赋值以VALUE，因此文件中如果要定义PATH环境变量，只需加入一行形如PATH=$PATH:/xxx/bin的代码即可。 
+（2）/etc/profile：是系统登录时执行的第二个文件，可以用于设定针对全系统所有用户的环境变量。该文件一般是调用/etc/bashrc文件。 
+/etc/bash.bashrc：系统级的bashrc文件，为每一个运行bash shell的用户执行此文件。此文件会在用户每次打开shell时执行一次。
+注意：/etc/environment是设置整个系统的环境，而/etc/profile是设置所有用户的环境，前者与登录用户无关，后者与登录用户有关。 这两个文件修改后一般都要重启系统才能生效。
+2.用户级（这些文件处于家目录下）
+（1）~/.profile: 是对应当前登录用户的profile文件，用于定制当前用户的个人工作环境。 
+每个用户都可使用该文件输入专用于自己使用的shell信息,当用户登录时,该文件仅仅执行一次!默认情况下,他设置一些环境变量,执行用户的.bashrc文件。这里是推荐放置个人设置的地方 
+（2）~/.bashrc: 是对应当前登录用户的bash初始化文件，当用户每次打开shell时，系统都会执行此文件一次。平时设置这个文件就可以了。 
+那么根据以上描述，这几个文件的执行先后顺序应当是： 
+/etc/enviroment –>/etc/profile –>~/.profile –>/etc/bash.bashrc–> ~/.bashrc
+
+ Linux下查看和添加环境变量
+$PATH：决定了shell将到哪些目录中寻找命令或程序，PATH的值是一系列目录，当您运行一个程序时，Linux在这些目录下进行搜寻编译链接。
+编辑你的 PATH 声明，其格式为：
+PATH=$PATH:<PATH 1>:<PATH 2>:<PATH 3>:------:<PATH N>
+你可以自己加上指定的路径，中间用冒号隔开。环境变量更改后，在用户下次登陆时生效，如果想立刻生效，则可执行下面的语句：$ source .bash_profile
+需要注意的是，最好不要把当前路径 “./” 放到 PATH 里，这样可能会受到意想不到的攻击。完成后，可以通过 $ echo $PATH 查看当前的搜索路径。这样定制后，就可以避免频繁的启动位于 shell 搜索的路径之外的程序了。
+1. 可用 export 命令查看PATH值
+[root@localhost u-boot-sh4]# export
+declare -x CVS_RSH="ssh"
+declare -x DISPLAY=":0.0"
+declare -x G_BROKEN_FILENAMES="1"
+declare -x HISTSIZE="1000"
+declare -x HOME="/root"
+declare -x HOSTNAME="localhost"
+declare -x INPUTRC="/etc/inputrc"
+declare -x LANG="zh_CN.UTF-8"
+declare -x LESSOPEN="|/usr/bin/lesspipe.sh %s"
+declare -x LOGNAME="root"
+declare -x LS_COLORS="no=00:fi=00:di=00;34:ln=00;36:pi=40;33:so=00;35:bd=40;33;01:cd=40;33;01:or=01;05;37;41:mi=01;05;37;41:ex=00;32:*.cmd=00;32:*.exe=00;32:*.com=00;32:*.btm=00;32:*.bat=00;32:*.sh=00;32:*.csh=00;32:*.tar=00;31:*.tgz=00;31:*.arj=00;31:*.taz=00;31:*.lzh=00;31:*.zip=00;31:*.z=00;31:*.Z=00;31:*.gz=00;31:*.bz2=00;31:*.bz=00;31:*.tz=00;31:*.rpm=00;31:*.cpio=00;31:*.jpg=00;35:*.gif=00;35:*.bmp=00;35:*.xbm=00;35:*.xpm=00;35:*.png=00;35:*.tif=00;35:"
+declare -x MAIL="/var/spool/mail/root"
+declare -x OLDPWD="/root"
+declare -x PATH="/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin"
+declare -x PWD="/opt/STM/STLinux-2.3/devkit/sources/u-boot/u-boot-sh4"
+declare -x SHELL="/bin/bash"
+declare -x SHLVL="1"
+declare -x SSH_ASKPASS="/usr/libexec/openssh/gnome-ssh-askpass"
+declare -x TERM="xterm"
+declare -x USER="root"
+declare -x XAUTHORITY="/root/.xauthkSzH7b"
+
+2. 单独查看PATH环境变量，可用：
+[root@localhost u-boot-sh4]#echo $PATH
+/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin
+3. 添加PATH环境变量(临时)，可用：
+[root@localhost u-boot-sh4]#export PATH=/opt/STM/STLinux-2.3/devkit/sh4/bin:$PATH
+再次查看：
+[root@localhost u-boot-sh4]# echo $PATH
+/opt/STM/STLinux-2.3/devkit/sh4/bin:/usr/kerberos/sbin:/usr/kerberos/bin:/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin:/root/bin
+说明添加PATH成功。
+上述方法的PATH 在终端关闭 后就会消失。
+
+4. 永久添加环境变量(影响当前用户)
+#vim ~/.bashrc
+export PATH="/opt/STM/STLinux-2.3/devkit/sh4/bin:$PATH"
+ 
+5.永久添加环境变量(影响所有用户)
+# vim /etc/profile
+在文档最后，添加:
+export PATH="/opt/STM/STLinux-2.3/devkit/sh4/bin:$PATH"
+保存，退出，然后运行：
+#source /etc/profile
+
+
+方案 1：如何使用 shutdown 命令关闭和重启 Linux 系统
+shutdown 命令用于断电或重启本地和远程的 Linux 机器。它为高效完成作业提供多个选项。如果使用了时间参数，系统关闭的 5 分钟之前，会创建 /run/nologin 文件，以确保后续的登录会被拒绝。
+
+通用语法如下：
+
+# shutdown [OPTION] [TIME] [MESSAGE]
+运行下面的命令来立即关闭 Linux 机器。它会立刻杀死所有进程，并关闭系统。
+
+# shutdown -h now
+-h：如果不特指 -halt 选项，这等价于 -poweroff 选项。
+另外我们可以使用带有 -halt 选项的 shutdown 命令来立即关闭设备。
+
+# shutdown --halt now
+或者
+# shutdown -H now
+-H, --halt：停止设备运行
+另外我们可以使用带有 poweroff 选项的 shutdown 命令来立即关闭设备。
+
+# shutdown --poweroff now
+或者
+# shutdown -P now
+-P, --poweroff：切断电源（默认）。
+如果您没有使用时间选项运行下面的命令，它将会在一分钟后执行给出的命令。
+
+# shutdown -h
+Shutdown scheduled for Mon 2018-10-08 06:42:31 EDT, use 'shutdown -c' to cancel.
+root@2daygeek.com#
+Broadcast message from root@vps.2daygeek.com (Mon 2018-10-08 06:41:31 EDT):
+The system is going down for power-off at Mon 2018-10-08 06:42:31 EDT!
+其他的登录用户都能在中断中看到如下的广播消息：
+
+[daygeek@2daygeek.com ~]$
+Broadcast message from root@2daygeek.com (Mon 2018-10-08 06:41:31 EDT):
+The system is going down for power-off at Mon 2018-10-08 06:42:31 EDT!
+对于使用了 -halt 选项：
+
+# shutdown -H
+Shutdown scheduled for Mon 2018-10-08 06:37:53 EDT, use 'shutdown -c' to cancel.
+root@2daygeek.com#
+Broadcast message from root@vps.2daygeek.com (Mon 2018-10-08 06:36:53 EDT):
+The system is going down for system halt at Mon 2018-10-08 06:37:53 EDT!
+对于使用了 -poweroff 选项：
+
+# shutdown -P
+Shutdown scheduled for Mon 2018-10-08 06:40:07 EDT, use 'shutdown -c' to cancel.
+root@2daygeek.com#
+Broadcast message from root@vps.2daygeek.com (Mon 2018-10-08 06:39:07 EDT):
+The system is going down for power-off at Mon 2018-10-08 06:40:07 EDT!
+可以在您的终端上敲击 shutdown -c 选项取消操作。
+
+# shutdown -c
+Broadcast message from root@vps.2daygeek.com (Mon 2018-10-08 06:39:09 EDT):
+The system shutdown has been cancelled at Mon 2018-10-08 06:40:09 EDT!
+其他的登录用户都能在中断中看到如下的广播消息：
+
+[daygeek@2daygeek.com ~]$
+Broadcast message from root@vps.2daygeek.com (Mon 2018-10-08 06:41:35 EDT):
+The system shutdown has been cancelled at Mon 2018-10-08 06:42:35 EDT!
+添加时间参数，如果你想在 N 秒之后执行关闭或重启操作。这里，您可以为所有登录用户添加自定义广播消息。例如，我们将在五分钟后重启设备。
+
+# shutdown -r +5 "To activate the latest Kernel"
+Shutdown scheduled for Mon 2018-10-08 07:13:16 EDT, use 'shutdown -c' to cancel.
+[root@vps138235 ~]#
+Broadcast message from root@vps.2daygeek.com (Mon 2018-10-08 07:08:16 EDT):
+To activate the latest Kernel
+The system is going down for reboot at Mon 2018-10-08 07:13:16 EDT!
+运行下面的命令立即重启 Linux 机器。它会立即杀死所有进程并且重新启动系统。
+
+# shutdown -r now
+-r, --reboot： 重启设备。
+方案 2：如何通过 reboot 命令关闭和重启 Linux 系统
+reboot 命令用于关闭和重启本地或远程设备。reboot 命令拥有两个实用的选项。
+
+它能够优雅的关闭和重启设备（就好像在系统菜单中惦记重启选项一样简单）。
+
+执行不带任何参数的 reboot 命令来重启 Linux 机器。
+
+# reboot
+执行带 -p 参数的 reboot 命令来关闭 Linux 机器电源。
+
+# reboot -p
+-p, --poweroff：调用 halt 或 poweroff 命令，切断设备电源。
+执行带 -f 参数的 reboot 命令来强制重启 Linux 设备（这类似按压机器上的电源键）。
+
+# reboot -f
+-f, --force：立刻强制中断，切断电源或重启。
+方案 3：如何通过 init 命令关闭和重启 Linux 系统
+init（“initialization” 的简写）是系统启动的第一个进程。
+
+它将会检查 /etc/inittab 文件并决定 linux 运行级别。同时，允许用户在 Linux 设备上执行关机或重启操作. 这里存在从 0 到 6 的七个运行等级。
+
+
+如何检查 Linux 上所有运行的服务
+执行以下 init 命令关闭系统。
+
+# init 0
+0： 停机 – 关闭系统。
+运行下面的 init 命令重启设备：
+
+# init 6
+6：重启 – 重启设备。
+方案 4：如何通过 halt 命令关闭和重启 Linux 系统
+halt 命令用来切断电源或关闭远程 Linux 机器或本地主机。 中断所有进程并关闭 cpu。
+
+# halt
+方案 5：如何通过 poweroff 命令关闭和重启 Linux 系统
+poweroff 命令用来切断电源或关闭远程 Linux 机器或本地主机。 poweroff 很像 halt，但是它可以关闭设备硬件（灯和其他 PC 上的其它东西）。它会给主板发送 ACPI 指令，然后信号发送到电源，切断电源。
+
+# poweroff
+方案 6：如何通过 systemctl 命令关闭和重启 Linux 系统
+systemd 是一款适用于所有主流 Linux 发型版的全新 init 系统和系统管理器，而不是传统的 SysV init 系统。
+
+systemd 兼容与 SysV 和 LSB 初始化脚本。它能够替代 SysV init 系统。systemd 是内核启动的第一个进程，并持有序号为 1 的进程 PID。
+
+
+chkservice – 一款终端下系统单元管理工具
+它是一切进程的父进程，Fedora 15 是第一个适配安装 systemd （替代了 upstart）的发行版。
+
+systemctl 是命令行下管理 systemd 守护进程和服务的主要工具（如 start、restart、stop、enable、disable、reload & status）。
+
+systemd 使用 .service 文件而不是 SysV init 使用的 bash 脚本。 systemd 将所有守护进程归与自身的 Linux cgroups 用户组下，您可以浏览 /cgroup/systemd 文件查看该系统层次等级。
+
+# systemctl halt
+# systemctl poweroff
+# systemctl reboot
+# systemctl suspend
+# systemctl hibernate
+
+
+
+linux，一切皆文件，文件就要有一定的组织方式，linux是以树形组织文件，LSB（linux标准库）下的FHS标准规定了目录结构，也就是说所有linux发行版都要遵守这个标准。
+任何文件系统中的数据分为数据和元数据。数据是指普通文件中的实际数据，而元数据指用来描述一个文件的特征的系统数据，诸如访问权限、文件拥有者以及文件数据块的分布信息(inode...)等等。在集群文件系统中，分布信息包括文件在磁盘上的位置以及磁盘在集群中的位置。用户需要操作一个文件必须首先得到它的元数据，才能定位到文件的位置并且得到文件的内容或相关属性。
+
+目录是一种特殊的文件
+linux中，文件名称严格区分大小写
+文件名不能包含“/”这个字符
+文件名最长度不能超过255个字符
+以点(.)开头的文件都是隐藏文件
+
+ 文件系统层次结构
+Linux系统中的所有文件存储在文件系统中，它们被组织到一个颠倒的目录树中，称为文件系统层级结构。这棵树是颠倒的，因为树根在该层次结构的顶部，树根的下方延伸出目录和子目录的分支。
+
+/
+	#根目录，所有的文件和目录，皆是由根目录延伸。 位于文件系统层次结构的顶部，/字符还用作文件名中的目录分隔符。/的子目录用于标准化的用途，以便根据文件和用途组织文件，还可以方便查找文件。
+/boot
+	#开机启动过程所需的文件，比如：内核文件，引导文件，驱动文件，boot目录一般在200M左右
+/opt
+	#第三方应用程序的安装位置，兼容老程序
+	#系统附件就装在这个目录中
+/srv
+	#系统自行管理的服务用到的数据
+/usr
+	#universal shared,read-only data,全局共享只读数据目录。可独立分区
+	#编辑安装的第三方软件、共享的库，包括文件和静态只读程序数据，重要的子目录：/usr/bin，用户命令；/usr/sbin，系统管理命令；/usr/local，第三方应用程序的安装位置，本地自定义软件
+/etc
+	#系统配置文件
+/var
+          #系统的可变数据，在系统启动之间保持永久性
+	#动态变化的文件，如：数据库、缓存目录、日志文件、打印机后台处理文档和网站内容
+	#可独立分区
+/run
+	#自本次系统启动以来启动的进程的运行时数据。包括进程ID文件和锁定文件等。此目录中的内容在重启时会重新创建。
+/root
+	#超级用户root的家目录
+/home
+	#普通用户的个人数据和配置文件的主目录，每切换用户时，首先就是切换到用户的家目录，每个用户的家目录里面有这个用户特有的环境变量，可以用ls -a查看有四个.bash开头的文件，就是这个用户的环境变量。比如：在root家目录下.bash_profile定义一个环境变量，export dd=test，在其它用户echo $dd，是不能输出的。工作中有可能需要为某些用户设置独有的环境变量。
+/proc	
+	#用于输出内核和进程信息相关的虚拟文件系统
+	#放置的是内存数据，不会占用磁盘空间，内存里有什么：1.系统开机时的硬件信息，比如；CPU的信息:/proc/cpuinfo，内存信息：/pro/meminfo。2进程信息，数字命名的文件都是进程的信息，数字代表这个进程的PID。
+/sys 
+	#用于输出当前系统上硬件设备相关信息的虚拟文件系统
+/tmp
+	#临时文件目录，供临时文件使用的全局可写空间，10天内未访问、未更改或未修改的文件将自动从该目录中删除，还有一个临时目录/var/tmp，该目录中的文件如果在30天内未曾访问、更改或修改过，将被自动删除。
+/dev
+	#设备文件目录，包含特殊设备文件，供系统用于访问硬件
+/media
+	#便携式移动设备挂载目录，比如：U盘，光盘
+/mnt 
+	#临时挂载用
+/bin
+	#供所有用户使用的基本命令，不能独立分区，系统启动时会用到的程序
+/sbin 
+	#管理类的基本命令，不能独立分区，系统启动时会用到的程序
+/lib
+	#基本共享库文件，以及内核模块文件
+/lib64
+	#专用于64位系统上的共享库文件
+ 
+总结：etc,bin,sbin,lib这几个目录必须和根目录在同一个分区
+在RHEL7中，/中的4个较旧的目录现在与它们在/usr中对应的目录拥有完全相同的内容：
+/bin和/usr/bin   /sbin和/usr/sbin  /lib和/usr/lib  /lib64和/usr/lib64  /中的目录是/usr中对应目录的符号链接（软链接）
+ 
+根据名称查找文件
+文件或目录的路径指定其唯一的文件系统位置，跟随文件路径会遍历一个或多个指定的子目录，用正斜杠/分隔，直到到达目标位置。与其他文件类型相同，标准的文件行为定义也适用于目录（文件夹）。
+
+根据一个路径定位一个文件在哪儿，路径又分为绝对路径和相对路径：
+绝对路径：所谓绝对路径是完全限定的名称，从根目录/起始，指定到达且唯一代表单个文件所遍历的每个子目录。可以通过一个简单的规则识别；第一个字符是正斜杠/的路径名时绝对路径。
+当用户登录并打开命令窗口时，初始位置通常是该用户的主目录。系统进程也有初始目录，用户和进程根据需要导航至其他目录。
+相对路径：与绝对路径一样，相对路径也标识唯一文件，仅从工作目录到达该文件所需的路径。从当前位置起始
+识别相对路径的简单规则：第一个字符是正斜杠/之外的其他字符的路径名就是相对路径名。
+对于标准的linux文件系统，文件路径名长度（含/字符）不可超过4095字节。路径名中通过/字符隔开每一部分的长度不可超过255字节。linux文件系统，都是区分大小写的。
+ 
+导航路径
+ls ./ #一个点表示当前目录
+ 
+ls ../ #两个点表示上一级目录，即当前目录的父目录
+ 
+pwd 
+#显示当前位置的完整路径名
+ 
+cd destination命令可以更改目录，在任何时候，都可以通过cd来返回到用户的主目录，无需指定目标位置，提示符显示波形符~字符，表示用户的当前目录是其主目录。
+cd     #返回到自己的家目录
+cd -   #返回上一次的工作目录
+cd ..   #切换到父目录
+cd ~  #切换到当前用户的家目录，如果指定用户，就切换到指定用户的家目录，比如：cd ~tt，就切换到tt这个用户的家目录，前提是有权限。 
+注：cd命令，其实在读取PWD(保存当前路径)，OLDPWD（保存上一次路径）变量的值
+ 
+目录的管理
+对于目录而言，只有该目录的子文件或子目录的名字
+ 
+查看目录
+ls
+-l 	输出权限、拥有者、拥有组、大小等详细信息
+	-代表是一个文件
+	d代表是一个目录
+	b 块设备文件
+	c 字符设备文件
+	l 连接文件
+	s 套接字文件，一般用于本地进程间的相互通讯
+-d	查看目录的信息
+-h	以人类可读的方式显示大小，按大小排序：-Sh
+-a 	包含隐藏文件在内的所有文件,以点（.）开头的都是隐藏文件。
+-R 	递归，包含子目录的内容
+-t 	按时间排序，时间越近的越靠前，如果想反过，时间越久的越靠前，-tr
+ 
+tree（如未安装，执行yum -y install tree）
+	#查看目录结构
+	#-d，只显示目录
+	#-L 3，指定显示的层级
+ 
+命令行文件的管理
+文件管理涉及创建，删除，复制和移动文件，此外，也可创建，删除，复制和移动目录，以帮助有条理地整理文件。在命令行执行文件管理时，要求知道当前的工作目录，这样才能为直接任务选用绝对或相对路径语法以实现最高效率。
+
+创建目录
+mkdir 
+-p 同时创建多级目录
+-m 创建目录同时，给予权限，比如：mkdir -m 777 /tmp/tt 
+注意：创建目录时，一定要注意路径是否正确。如果文件名已经存在，或者尝试在不存在的父目录中创建目录，将生成错误。
+ 
+mkdir /mnt/d{1..9}
+	#以展开方式，创建
+	 
+删除文件和目录
+	删除操作，一定要注意，确定你要删除的是谁，并且删除的确实是你想要删除的东西。
+rmdir 
+	这个命令只能删除空目录，如果目录下有文件，必须先把文件删除，才能删目录
+rm -r
+	rm本意思是删除一个文件，加上-r选项，递归删除， 先删除该目录下的子文件和子目录，再删除指定目录。
+rm -rf
+	强制删除，不会作任何提示，很容易删错，如：rm -rf /tm/tt和rm -rf /tmp/tt/*两条命令结果是不一样的。
+rm  如果使用-i参数，则将以交互方式提示每个删除操作，基本上与-f是相反的，后者将强制进行删除而不会提示用户 
+目录的移动
+mv /tmp/tt /root 
+	将tt这个目录移动到/root目录下,包括子目录和子文件也一起移动。
+mv /tmp/tt /tmp/dd	
+	把tt这个目录改个名字为dd
+mv命令在同一个目录中是重命名文件，或者将文件重新放到新的目录中，文件内容保持不变。
+ 
+目录的复制
+cp -r 将目录及目录下的子文件和子目录一同复制，cp的本意是复制一个文件，复制带有内容的非空目录要求使用-r递归选项
+
+复制文件
+cp命令复制一个或多个文件，成为新的独立文件，其语法允许将一个现有文件复制为当前或另一个目录中的一个新文件，或者将多个文件复制到另一目录中，在任何目标位置上，新文件名都必须唯一，如果新文件名不唯一，那么复制命令将覆盖现有文件。
+在通过一个命令复制多个文件时，最后一个参数必须是目录
+ 
+touch
+创建一个新文件
+更新文件的时间戳为当前时间。
+	一个目录和文件有3种时间：
+	mtime 文件内容被修改时间，ls -l查看的就是这个时间
+	atime 文件最近一次被访问时间，查看：ls -l /tmp/f1 --time=atime
+	ctime 文件属性(元数据)发生变化的时间，属性：权限、拥有者，拥有组。查看：ls -l /tmp/f1 --time=ctime
+	 
+touch -m -t 200101010101 /mnt/f1
+	#更改文件的修改时间为：年月日时分
+	#-m,修改时间
+	#-a,访问时间
+	#-c,如果文件不存在，不创建
+ 
+stat /tmp/f1
+	#获取文件的元数据
+	#包括三个时间
+	 
+touch f\ 1
+	#创建一个带空格的文件名
+ls f\ 1
+ls f[[:space:]]1
+ 
+[[:digit:]]
+	#表示数字
+ 
+查看文件
+file
+	#查看文件类型
+wc
+	#统计文件行数、单词数、字符数
+	#-l,只统计行数
+	#-w,单词数
+	#-c,字符数
+sort /etc/passwd   按照会话指定的默认语言的排序规则对文本文件中的数据行排序
+	#按字母排序输出
+	#-r，反序输出
+	#-f，忽略大小写
+	#-t,字段分隔符
+	#-k,指定字段为标准排序
+	-k和-t参数在对按字段分隔的数据进行排序时非常有用
+	sort -t ':' -k 3 -n /etc/passwd
+	#-n,按数值大小排序，它会告诉sort命令把数字识别成数字而不是字符，并且按值排序，对数值排序很有用
+	#-u，uniq,排序后去重
+	#-M 识别三字符的月份名，并相应地排序
+uniq 
+	#相邻去重，但不进行排序
+	#-c，显示每行重复出现的次数
+	#-d，仅显示重复过的行
+	#-u,仅显示不曾重复的行
+cat
+	#把文件内容全部输出，加-n选项，显示行号
+cat -E
+	#输出文件的换行符
+tac
+	#反向查看文件，从最后一行开始反向查看一个文件内容
+more
+	#分页显示，空格/f往下翻页，b往上翻页，enter住下翻行，不能往上翻行。more还带有搜索功能，/搜索关键字，n下一个关键字。
+less
+	#用法和more类似，不同的是，less可以循环方式查看文件，j往上翻行,k往下翻行
+head
+	#只显示文件的前10行，-n 选项可以指定只显示第几行。如：head -n 1，只显示第一行
+tail
+	#只显示文件的后10行，也可用-n选项指定行数
+tail -f 
+	#跟踪显示文件新追加的内容
+
+grep ‘linuxcast’ /etc/passwd
+find / -user linuxcast | grep video 
+·-i  在搜索的时候忽略大小写
+·-n  显示结果所在行数
+·-v  输出不带关键字的行
+·-Ax 在输出的时候包含结果所在行之后的指定行数(After)
+·-Bx 在输出的时候包含结果所在行之前的指定行数(Before)
+
+命令cut用以基于列处理文本内容
+cut -d: -f1 /etc/passwd
+grep linuxcast /etc/passwd | cut -d: -f3 
+·-d  指定分割字符(默认是TAB)
+·-f  指定输出的列号
+·-c  基于字符进行分割  cut  -c2-6 /etc/passwd
+diff用于比较两个文件的区别
+
+ 
+复制文件
+cp 
+	复制多个文件时，最后一个参数必须为目录
+	cp file1 file2 /dir
+cp -a
+	最常用的方法，保持文件的连接和属性，并递归处理。
+	和cp -pdR一个意思，-p表示保持属性，-d表示保护文件的连接，-R表示递归
+ 
+移动文件
+mv 
+	移动一个文件
+	也可用作重命名一个文件
+	mv file1 file2 /dir
+ 
+删除文件
+rm
+rm file
+
+删除重复文件
+Rdfind 意即 redundant data find（冗余数据查找），是一个通过访问目录和子目录来找出重复文件的自由开源的工具。它是基于文件内容而不是文件名来比较。Rdfind 使用排序算法来区分原始文件和重复文件。如果你有两个或者更多的相同文件，Rdfind 会很智能的找到原始文件并认定剩下的文件为重复文件。一旦找到副本文件，它会向你报告。你可以决定是删除还是使用硬链接或者符号（软）链接代替它们。
+yum install rdfind 一旦安装完成，仅带上目录路径运行 Rdfind 命令就可以扫描重复文件。
+[root@abin ~]# rdfind /root
+Now scanning "/root", found 34 files.
+Now have 34 files in total.
+Removed 0 files due to nonunique device and inode.
+Now removing files with zero size from list...removed 2 files
+Total size is 35219 bytes or 34 KiB
+Now sorting on size:removed 28 files due to unique sizes from list.4 files left.
+Now eliminating candidates based on first bytes:removed 2 files from list.2 files left.
+Now eliminating candidates based on last bytes:removed 0 files from list.2 files left.
+Now eliminating candidates based on md5 checksum:removed 0 files from list.2 files left.
+It seems like you have 2 files that are not unique
+Totally, 8 B can be reduced.
+Now making results file results.txt
+[root@abin ~]# cat results.txt 
+# Automatically generated
+# duptype id depth size device inode priority name
+DUPTYPE_FIRST_OCCURRENCE 8 0 8 64768 35098949 1 /root/egg
+DUPTYPE_WITHIN_SAME_TREE -8 0 8 64768 35754781 1 /root/egg1
+# end of file
+可在不修改其他事情情况下使用 -dryrun 选项找出所有重复文件，并在终端上输出汇总信息。
+$ rdfind -dryrun true ~/Downloads
+如果你不再想要这些旧文件，删除重复文件，就运行：
+$ rdfind -deleteduplicates true ~/Downloads
+
+ 
+文件通配：路径名扩展
+通配符用于匹配路径名称，通配是一种shell命令解析操作，它将一个通配符模式扩展到一组匹配的路径名，在执行命令之前，命令行元字符由匹配列表替换，不返回匹配项的模式，将原始模式请求显示为字面上的文本。
+
+* 		代表任意长度的任意个字符
+?		代表有且仅有一个任意字符，多个字符就加多个?
+[0-9]	中括号仅代表一个字符，0-9表示，匹配0到9中间任意一个字符
+[1,3] 	逗号表示只匹配1或3
+[!1] 	叹号表示非
+[^1] 	和叹号意思一样
+[a-zA-Z] 表示任意一个大小写字母
+
+波形符~后接斜杠分隔符时可匹配当前用户的主目录，当后接一个字符串直到斜杠时，如果可找到匹配项，则它被解释为用户名。如果找不到匹配的用户名，则返回实际波形符加上该字符串
+
+大括号（花括号）扩展用于生成任意字符串，大括号包含字符串的逗号分隔列表或顺序表达式，结果包含大括号之前或之后的文本，大括号扩展可以互相嵌套。
+
+
+命令替换允许命令的输出替换命令本身，当命令包含前导美元符号和括号$(command)或者反引号`command`时，就会发生命令替换，反引号形式比较老旧，而且有2个缺点：反引号在视觉上很容易与单引号混淆；反引号无法嵌套在反引号内。$(command)形式可以互相嵌套多个命令扩展。 
+字符集合：
+[:digit:]	任意数字，0-9
+[[:digit:]] 一个任意数字
+[:lower:] 任意小写字母
+[:upper:] 任意大写字母
+[:alpha:] 任意大小写字母
+ 
+控制符：
+\t	制表符
+\n	换行符
+echo -e "how \tare you"
+	#-e，允许转义符，也就是允许使用控制符
+echo -e "how \nare you"
+
+在bash shell中，许多字符由特殊含义，为了忽略元字符的特殊含义，使用引号和转义来防止它们被shell扩展。反斜杠\是bash中的转义字符，防止其后的一个字符被特殊解释，如果保护较长的字符串，则使用单引号‘’或双引号“”来括起字符串。
+使用双引号可以阻止通配和shell扩展，但依然允许命令和变量替换，变量替换在概念上与命令替换一样，但可能使用可选的大括号语法。
+
+使用单引号可以按字面解释所有文本，在屏幕和键盘上观察单引号和命令替换反引号的区别，除了阻止通配和shell扩展外，引号也指示shell额外阻止命令替换和变量替换，问号也是一个需要防止扩展的元字符。
+
+单引号与双引号的最大不同在于双引号仍然可以保有变量的内容，但单引号内仅能是
+一般字符 ，而不会有特殊符号。我们以底下的例子做说明：假设您定义了一个变量， 
+name=VBird ，现在想以 name 这个变量的内容定义出 myname 显示 VBird its me 这
+个内容，要如何订定呢？                 
+              [root@linux ~]# name=VBird 
+              [root@linux ~]# echo $name 
+              VBird 
+              [root@linux ~]# myname="$name its me" 
+              [root@linux ~]# echo $myname 
+              VBird its me 
+              [root@linux ~]# myname='$name its me' 
+              [root@linux ~]# echo $myname 
+              $name its me 
+
+
+说到引号的区别，先要说为什么要用引号，shell命令中有些特殊字符，比如$,^,*等等，如果我们想要把这些特殊字符的功能关掉的话就必须使用引号或者斜杠\,比如 ls "a*",或者ls 'a*'，或者ls a\*这就会输出名字为a*的文件，而不是以a开头的文件。
+不说斜杠，只说单引号和双引号的区别，它们在shell中的引文的叫法不一样，双引号叫soft quote,单引号叫hard quote，顾名思义，单引号更加严格，比如overawe的例子，对于$符号，单引号一样会关掉它的功能，而双引号不会，它会把它当成变量来替换掉，有兴趣的话你可以比较单引号套双引号的变量和双套单的变量输出的区别，a=1;echo "'$a'" ;echo '"$a"'
+
+
+help
+内部命令帮助：（使用type 命令查看是否内建命令）
+help echo
+#查看echo命令的帮助，因为echo是一个内建命令
+ 
+外部命令帮助：
+ls --help
+#查看ls命令的简单帮助，详细帮助要用man
+#/bin 目录下面都是外部命令，如：/bin/ls,如果：mv /bin/ls /bin/lls，那ls命令就不能用了。
+ 
+查看一个命令帮助的时候：
+[] 	可选
+... 	同一内容可出现多次
+| 	多选一
+<> 	必选
+ 
+man命令介绍
+每个程序，都有帮助文档，但大量的文档，会占用大量空间，所以需要压缩，man手册就是压缩过的程序文档。
+为区分不同章节中相同的主题名称，man page参考中在主题后附上了章节编号（用括号括起）。例如：passwd（1）介绍更改密码的命令，而passwd（5）说明用于存储本地用户账户的/etc/passwd文件格式
+man 1 passwd     man 5 passwd
+man命令以配置的顺序搜索手册章节，首先显示热门的章节。
+	 
+cat /etc/man.config
+#man手册的配置文件
+#指定了man命令搜索路径
+	 
+man总共分9个章节，对运维人员来说，主要 1，5章节，man命令以less方式打开帮助手册，运用特定故障排除工具的管理员也使用第2节。
+man 1	用户命令（可执行命令和程序）
+man 2	系统调用（从用户空间调用的内核例程）
+man 3	库函数调用（由程序库提供）
+man 4	设备文件和特殊文件
+man 5	配置文件，文件格式（用于许多配置文件和结构）
+man 6	游戏（过去的有趣程序章节）
+man 7	惯例、协议、标准等
+man 8	系统管理和特权命令，比如磁盘分区命令（维护命令）
+man 9	linux内核API（内核调用）
+ 
+
+whatis read
+#搜索man手册，包含read的章节。
+#whatis，有一个数据库，可将系统上所有的帮助手册与之对应的关键关创建为一个数据库，命令就是从它的数据库中查寻数据
+#mkwhatis，手动创建数据库
+#默认，系统有一个计划任务，自动创建这个数据库
+	 
+查找passwd这个文件的帮助
+passwd既是一个命令又是一个配置文件，如果直接man passwd，会从第一章开始往后查找，一直找到为止，然而在第一章命令章节里，就有passwd，所以这样找到的是passwd这个命令的帮助。如果要查找passwd这个配置文件的帮助：man 5 passwd
+
+使用man -k keyword对man page执行关键字搜索，这会显示与关键字匹配的man page主题和章节编号的列表 
+man -k passwd 
+	#查看包含passwd这个关键字的有哪些章节
+	 
+在man手册中，查看内部命令cd的帮助信息
+man cd
+#发现，打开的是bash手册
+ 
+info
+info命令比man命令更加详细，但我们一般很少去用它。
+info文档结构由超链接式的info节点组成，此格式比man page更灵活，允许对复杂命令和概念进行彻底说明，与man page相似，节点可以从命令通过infoinfo或pinfo命令读取。
+一些命令和实用工具同时拥有man page和info文档，通常而言，info文档的内容将更加深入。
+info命令使用不同于man的导航击键操作，info命令设计为与超文本感知型lynx web浏览器的击键操作相符。
+
+ 
+程序的自身文档
+安装软件的时候，会在/usr/share/doc/packagename目录下先创建一个以程序名命名的目录，然后把自己的说明文档和使用方法文档放在该目录下，也可到相应程序的官方网站查看相应的官方文档。软件包生成人员或许也会纳入任何有帮助的文档，作为man page的补充，而不重复其内容，GNU软件也使用/usr/share/doc作为info节点的补充。
+大多数软件包含有介绍软件包分发许可的文件，一些软件包含有大量基于PDF或HTML的文档，相应地，浏览软件包的一个有用方式将选用的浏览器指向firefox  file:///usr/share/doc，再利用鼠标进行操作。
+	 
+获取红帽帮助
+红帽客户门户（https://access.redhat.com),让客户能通过一个便捷的位置，访问其订阅提供的所有内容。客户可以通过web浏览器使用红帽客户门户，使用命令行工具redhat-support-tool访问红帽客户门户服务，但这个是要付费的。
+
+
+标准输入、标准输出和标准错误
+输入：对一个文件输入，除了键盘输入外，还可以通过一个文件输入
+输出：执行一个命令，会有相应的输出到屏幕上。输出有标准的正确输出和错误输出。
+重定向：把一个输出结果，再输出到另一个文件或一个终端
+ 
+linux中有三种标准输入输出，分别是STDIN，STDOUT，STDERR，对应的数字是0，1，2
+1.STDIN就是标准输入，默认从键盘读取信息
+2.STDOUT是标准输出，默认将输出结果输出至终端，也就是显示器之类的东西
+3.STDERR是标准的错误信息，默认也会显示在终端上。
+4.由于STDOUT与STDERR都会默认显示在终端上，为了区分二者的信息，就有了编号的0，1，2的定义，用1表示STDOUT，2表示STDERR。
+
+ 
+
+重定向输出到文件 
+利用重定向，通常发送到终端窗口的进程输出和错误信息可以捕获为文件内容，发送到设备或者丢弃。重定向stdout可以阻止进程输出显示在终端上。仅重定向stdout不会阻止stderr错误消息显示在终端上，如果文件不存在，则会创建文件，如果文件确实存在，但是所需的重定向没有附加到文件，则该文件的内容将被覆盖。特殊文件/dev/null以静默方式丢弃重定向到其自身的通道输出，并且始终是空文件。
+
+
+
+
+标准正确输出重定向：
+1> 覆盖式重定向。不加前面的1，默认就是正确输出
+1>> 追加式重定向。
+ 
+标准错误输出重定向：
+2> 覆盖
+2>> 追加
+ 
+& 表示所有的正确和错误输出
+ 
+以普通用户执行 find /etc -name passwd 命令，默认会将命令的执行结果（STDOUT）与错误信息（STDERR）都输出至终端显示器。
+执行find /etc -name passwd >find.out 2>find.err，会将STDOUT与STDERR分别存放至find.out和find.err中。该命令也可以写成下面三种形式
+          find /etc -name passwd 1>find.out 2>find.err
+          find /etc -name passwd 2>find.err >find.out
+          find /etc -name passwd 2>find.err 1>find.out
+若要将所有标准输出及标准错误都输出至文件，可用&表示全部1和2的信息，eg：
+          find /etc -name passwd &>find.all 或 find /etc -name passwd >find.all 2>&1
+         2>&1 ---标准错误重新定向到标准输出
+用法：find /etc -name passwd &2>&1 |less
+          可分解成
+          find /etc -name passwd & 表示前面的命令放到后台执行。
+          2>&1 |less 表示将标准错误重定向至标准输出，并用less进行分页显示
+ 
+adfkldf >> /tmp/t.txt
+	#如果还有输出，说明这个重定向方式没起作用的，也就是说这是一个错误的输出，反之，就是一个正确的输出。
+	 
+echo $? 
+	只是判断上一次命令有没有执行成功，不能判断输出是一个标准正确还是错误输出。
+ 
+ls > /dev/null 
+	相当于把输出结果丢到垃圾筒
+
+>file  清空file文件
+ 
+怎么同时把标准正确和错误的输出重定向到同一个文件呢？
+find /home -name kiosk 1>>/tmp/tt 2>>/tmp/tt
+	#这种方式会打乱输出顺序，先重定向正确输出，才会输出错误输出。
+find /home -name kiosk &> /tmp/tt 
+	#这种方法就不会打乱输出顺序
+	#&表示所有正确和错误的输出
+重定向操作的顺序非常重要，以下序列将标准输出重定向到file，然后将标准错误作为标准输出重定向到相同位置>file >file 2&>1,但是，下一个序列以相反的顺序执行重定向，这会将标准错误重定向到标准输出的默认位置（终端，因此没有任何更改），然后仅将标准输出重定向到file  2>&1 >file.  大家更倾向于使用合并重定向运算符：&>file 而不是>file 2>&1           &>>file 而不是>>file 2>&1
+ 
+有时候希望将一个错误输出重新定向到正确输出，就是将2的结果重定向至1中，就有了"2>1"这样的思路，如果按照上面的写法，系统会默认将错误输出重定向到一个名字为1的文件中，而非标准输出中。因此需要加&进行区分，就有了 2>&1
+find /home -name kiosk > /tmp/tt 2>&1 
+	#把一个错误输出转换成正确输出，然后再以正确输出重定向到tt
+command >file 2>&1 
+首先command >file 2>file 的意思是将命令所产生的标准输出信息,和错误的输出信息送到file中；command>file 2>file 这样的写法,stdout和stderr都直接送到file中, file会被打开两次,这样stdout和stderr会互相覆盖,这样写相当使用了两个同时去抢占file的管道.定向了2次。
+那如果使用command >file 2>&1 这条命令就将stdout直接送向file,stderr 继承了第一次重定向(FD1)到管道后,再被送往file,此时,file 只被打开了一次,也只使用了一个管道FD1,它包括了stdout和stderr的内容。
+#2>&1，表示2的输出重定向等同于1 
+输入重定向
+从一个文件的标准输出，再把这个输出作为输入到另一个文件
+	 
+< 输入重定向
+cat > /tmp/tt 
+	#通过键盘输入，重定向到tt这个文件,以ctrl+d结束
+cat > /tmp/tt < /etc/passwd 
+	#把/etc/passwd这个文件内容作为输入，然后重定向到tt这个文件
+cat > /tmp/tt <<”EOF” 
+	#定义一个结束符，当输入EOF，键盘输入就会结束。
+	注意：EOF不是固定字符，可以自己随便定义。
+	 
+tr abc ABC < /etc/fstab
+	#将/etc/fstab文件中的所有a，换成A，b换成B,c换成C
+	#tr命令，替换字符
+	 
+tr 'a-z' 'A-Z' < /etc/fstab
+	#将所有小写字母，替换成大写输出
+ 
+管道
+一个管道，是一个多个命令的序列，由|（管道字符）分隔，管道将一个个命令的标准输出连接到下一个命令的输入。
+|  把管道符前面的命令的标准输出，当作后面命令的输入。
+	cat /etc/passwd | more
+ls 123.txt | xargs cat 把管道符前面的输出作为xargs后面命令的输入，好处在于可以把原本2步或者多步完成的任务仅用一步完成，xargs常和find命令一起使用，比如查找当前目录创建时间大于10天的文件，然后再删除：find . -mtime +10|xargs rm (-r)
+xargs还有一个神奇的功能，比如要查找当前目录下所有后缀为.txt的文件，然后把这些文件变成.txt_bak.正常情况下必须写脚本才能实现，使用xargs可以一步完成：
+mkdir test
+cd test
+touch 1.txt 2.txt 3.txt 4.txt
+ls
+ls *.txt |xargs -n1 -i{} mv {} {}_bak
+xargs -n1 -i{}类似于for循环，-n1表示逐个对象处理，-i{}表示用{}取代前面的对象，mv {} {}_bak相当于mv 1.txt 1.txt_bak
+使用find命令时，也经常用-exec选项，它可以达到和xargs同样的效果，比如查找当前目录创建时间大于10天的文件并删除：find . -mtime +10 -exec rm -rf {} \;    这个命令也是用{}替代前面find出来的文件，后面的\作为;的转义符，否则shell会把分号作为该命令行的结尾。-exec也可以实现批量更改文件名的需求：find ./*_bak -exec mv {} {}_bak \;
+
+tee 如果在管道符后面使用了tee，不仅可以保存输出，同时输出到终端。
+cat /etc/passwd | tee f.txt
+pwd | tee -a f.txt
+#-a，追加
+当重定向和管道组合时，shell会首先设置整个管道，然后重定向输入/输出。这意味着，如果在管道的中间使用了输出重定向，则输出将转至文件，而不是前往管道中的下一个命令。
+ls -t /usr/bin |head -n 10 > /tmp/tt
+[root@server0 ~]# ls -t /usr/bin >/tmp/tt2 | head -n 10
+在管道中，tee会将其标准输入复制到其标准输出中，并且还会将标准输出重定向到指定为命令参数的文件。如果将数据想象成流经管道的水，那么可将tee想象成管道中的T形接头，它负责输出在2个方向上的流向。
+[root@server0 ~]# ls -t /usr/bin |tee /tmp/tt2 | head -n 10
+csh
+rnano
+atq
+atrm
+setup
+traceroute6
+cdrecord
+dvdrecord
+readcd
+vimdiff
+如果在管道末尾使用tee，则可以保存命令的最终输出并且同时输出到终端。
+[root@server0 ~]# ls -t /usr/bin | head -n 11 |tee /tmp/tt3
+csh
+rnano
+atq
+atrm
+setup
+traceroute6
+cdrecord
+dvdrecord
+readcd
+vimdiff
+rvim
+可以通过管道来重定向标准错误，但是不能使用合并的重定向运算符（&>和&>>)执行此操作。
+
+vi和vim
+vi和 vim都是文本编辑器，vim是vi的升级版
+vim会高亮显示，而vi不会
+vim编辑器在内存缓冲区处理数据。如果在启动vim时未指定文件名，或者这个文件不存在，vim会开辟一段新的缓冲区域来编辑，如果你在命令行下指定了一个已有文件的名字，vim会将文件的整个内容读到一块缓冲区域来准备编辑。
+最初的vim编辑窗口显示了文件的内容（如果有内容的话），并在窗口底部显示了一条信息行，如果文件内容并未占据整个屏幕，vim会在非文件内容行放置一个波浪线，底部的消息行根据文件的状态以及vim安装时的默认设置显示了编辑文件的信息，如果文件时新建的，会出现消息[New File]
+Linux的一个重要设计原则是信息存储在基于文本的文件中。第一次打开vim时，以命令模式启动，可用于导航、剪切、黏贴，以及其他文本操作。通过单字符击键操作进入各个其他模式，访问特定的编辑功能：
+1、按i键进入插入模式，其中键入的所有文本将变为文件内容，按esc键返回命令模式
+2、按v键进入可视模式，可在其中选择多个字符进行文本操作，使用V键选择多行，使用ctrl+v可选择文本块。用于进入可视模式的击键操作（v，V后者ctrlv)也可用于退出。
+3、按：键启动扩展命令模式，可以执行的任务包括写入文件进行保存，以及退出vim编辑器等。
+命令行模式
+yy	复制一行，复制10行：10yy
+p	粘贴到光标所在的下一行,10p就是把复制的内容粘贴10次
+P	粘贴到光标所在的上一行
+dd	剪切光标所在行，100dd，剪切光标以下100行
+d1G	从光标所在行，删除到第一行
+dG	从光标所在行，删除到最后一行
+D	从光标处剪切到行尾，这时，p，会在光标后面粘贴
+gg	光标回到第一行行首
+G	光标到最后一行行首
+$	移动光标到当前行尾
+0	数字零，移动光标到当前行首，或者是^
+x	删除光标所在字符，2x，从光标往后删除2个字符
+X	往前删
+r	替换光标处单个字符，r2，把光标处字符替换成2
+R	进入替换模式，一直替换，除非按esc，回到命令行模式
+u	撤消上一次操作
+ctrl+r	恢复上一次的撤消操作
+.	重复上一次操作
+h	向左移动
+j	向下移动
+k	向上移动
+l	向右移动
+ctrl+f	向下一页
+ctrl+b	向上一页
+dw	删除当前光标所在位置的单词
+d$	删除当前光标所在位置至行尾的内容
+ 
+编辑模式
+从命令行模式进入编辑模式的方式:
+i	在光标当前位置的前面插入字符
+I	光标移动当前行的行首
+a	光标往后退一个字符
+A	光标移动到行尾
+o	光标所在行下一行新起一行
+O	上一行新起一行
+ 
+回到命令行模式，按esc键，切换到其它模式必须先回到命令模式，再切换
+图形化下用鼠标复制粘贴内容，要先进入编辑模式，否则会掉东西
+ 
+末行模式
+:wq	保存退出，或:x
+:wq!	强制保存退出，对一个只读文件。不过到底能不能写入，还是跟权限有关
+:w f1	另存到f1这个文件
+:q	退出
+:q!	强制不保存退出
+:set nu	显示行号
+:set nonu	取消行号
+:9	光标移动到第9行行首
+/	往光标所在行之下搜索关键字
+?	往光标所在行之上搜索关键字
+n	下一个关键字
+N	上一个关键字
+
+替换命令允许你快速使用另一个单词来替换文本中的某个单词，必须进入命令行模式才能替换命令，替换命令的格式是:s/old/new/，vim编辑器会跳到old第一次出现的地方，并用new来替换，也可以对替换命令作一些修改来替换多处文本。
+:s/old/new/g  光标所在行命令替换所有old
+:n,ms/old/new/g 替换行号n和m之间的所有old
+:%s/old/new/g 替换整个文件中的所有old
+:%s/old/new/gc 替换整个文件中的所有old，但在每次出现时提示。
+例如： :1,2s/^/#/g
+
+
+
