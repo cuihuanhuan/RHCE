@@ -1,0 +1,880 @@
+什么是用户？
+系统中的每个进程（运行程序）都作为一个特定用户运行，每个文件归一个特定用户所有，对文件和目录的访问受到用户的限制，与运行进程相关的用户可确定该进程可访问的文件和目录。
+linux系统是一个多用户的系统，同一个账号可以多次同时登陆
+对每一个进程而言，也有一个拥有者
+id命令用于显示有关当前已登录用户的信息，也可以通过在用户的用户名中传递作为id命令的首个参数来请求有关其他用户的基本信息。如果要查看与某一文件或目录相关的用户，使用ls -l命令，第三列显示用户名。
+要查看进程信息，可使用ps命令，默认为仅显示当前shell中的进程，添加a选项可查看与某一终端相关的所有进程，若要查看与进程相关联的用户，使用包含u选项。
+	 
+3种类型的用户：
+1.超级管理员，root
+2.系统用户，服务和内核态进程对应的用户，可以通过ps -ef 查看，比如：ps -ef |grep httpd，可以看到httpd有一个系统用户，叫apache
+3.普通用户
+	 
+UID
+系统通过UID去区分用户，不是用户名，每一个用户都有一个唯一的标识:
+0，超级管理员，可以用id root查看
+1-999，系统用户，在rhel7.0之前是0－499，1-200是静态分配给红帽的系统进程，201-999供文件系统中没有自己的文件的系统进程使用。
+1000及以上，普通用户，7.0之前是500及以上
+定义文件：/etc/login.defs
+	 
+
+/etc/passwd 
+保存的用户信息，每个用户一行，以冒号分隔成7列:
+username:password:UID:GID:GECOS:/home/dir:shell
+1.用户名，username是UID到名称的一种映射
+2.都是x，这是之前的密码保存位置，不安全，所以后来把密码分开存放，密码存储在/etc/shadow的单独文件中
+3.用户的UID
+4.GID，组ID，这个用户的主要组ID，一个用户只能属于一个主组，但可以属于多个附加组
+5.这个用户的描述信息，字段是任意文本，通常包含用户的实际名字，可以用usermod -c “adfasdf” tt 为用户tt添加描述信息
+6.用户的家目录，用户的个人数据和配置文件的位置
+7.该用户的shell类型，用户登录时运行的程序，对于普通用户，通常是提供用户命令行提示符的程序。
+ 
+
+/etc/shadow  加密密码或“密码哈希”存储位置，RHEL7默认使用SHA-512加密（/etc/login.defs  
+# Use SHA512 to encrypt password.
+ENCRYPT_METHOD SHA512 )
+以冒号分隔成9列:
+1.用户名
+2.加密密码
+	#经过MD5生成的一个hash值，hash不能倒推，但加密可以解密。hash值一般用于身份验证。
+	#如果此处是两个！，表示这个用户没有设置密码
+	#passwd -l tt 锁定这个用户密码，会在hash值之前多两个!，这时除了root用户，在其它用户下去用这个用户去登陆，就不允许登陆，因为PAM模块规定了，当root用户切换到其它用户时，不需要验证密码，而普通用户需要。
+	#passwd -u tt 解锁
+3.自上次更改密码后过去的天数，这个时间是从1970年1月1日算起
+4.最短密码期限，从最近一次更改密码的日期算起，再过多少天之后才能再次更改密码，0表示无最短期限，随时可以改
+5.最长密码期限，必须在这个期限内更改密码，否则过了这个期限，密码将过期
+6.密码警告期限，密码过期前多少天开始提醒用户更改密码，0表示不提醒
+7.密码过期之后的宽限天数，也就是说，密码过期之后，在这个期限内，密码还是可以用的，但如果过了这个期限，密码也就真的失效了，只能找管理员改密码了。
+8.账号到期时间，也是从1970年1月1日算起
+9.保留
+ 
+命令行更改密码过期时间
+chage [选项] 用户名
+-m：密码可更改的最小天数。为零时代表任何时候都可以更改密码。
+-M：密码保持有效的最大天数。
+-W：用户密码到期前，提前收到警告信息的天数。
+-E：帐号到期的日期。过了这天，此帐号将不可用。
+-d：上一次更改的日期。
+-I：停滞时期。如果一个密码已过期这些天，那么此帐号将不可用。
+chage -m 1 -M 10 -W 7 -I 17 tt
+cat /etc/shadow
+	tt:!!:16942:1:10:7:17::
+解释：1天之内不能修改密码，10天之后密码到期，密码到期前7天提醒，宽限17天
+如果要改默认值，可以到/etc/login.defs里修改
+chage -l username将列出用户名的当前设置
+chage -E YYYY-MM-DD username将在指定的日期使账户到期
+date可以用来计算未来日期  date -d "+45 days"
+usermod -L -e 1 username 锁定账户并使其过期   #如果只带-L，账户仍可以正常使用
+chage -E -1 student  #设置永不过期
+usermod -L student #ssh student@server0正常登陆，但是普通用户su - student提示su: Authentication failure
+
+用户有时需要一个账户并通过密码与系统进行身份验证，但不需要在系统上使用交互式shell，用户不需要直接登录系统。可以将用户的登录shell设为/sbin/nologin,如果用户尝试直接登录系统，nologin shell将直接关闭该连接。使用nologin shell可以防止以交互式使用系统，但不会阻止所有访问，用户依然可以通过身份验证，并使用web应用，文件传输程序或邮件读取程序等应用上传或检索文件。
+usermod -s /sbin/nolgin student = chsh -s /sbin/nologin student
+
+什么是组？
+与用户一样，组也有名称和编号GID，本地组在/etc/group中定义。
+和UID一样，GID在分配时也采用了特定格式。/etc/group文件有4个字段：
+组名，组密码，GID，属于该组的用户列表
+千万不能直接通过修改/etc/group文件来添加用户到一个组
+主要组：每个用户只有一个主要组，对于本地用户，主要组通过/etc/passwd第4字段中列出的组的GID编号定义，通常用户创建的新文件归主要组所有，新建用户的主要组是名称与用户相同的新建组。
+
+补充组，也叫附属组：用户可以是0个或者多个补充组的成员，属于本地组补充成员的用户列在/etc/group中组的条目的最后一个字段中，对于本地组，成员身份由/etc/group中组条目的最后一个字段中的逗号分隔用户列表确定，补充组成员身份用于帮助确保用户具有对系统中文件及其他资源的访问权限。
+
+root用户
+大多数操作系统都有某种超级用户，这是拥有系统所有权限的用户，该用户就是root用户，该用户的特权高于文件系统上的一般特权，用于管理系统，要执行诸如安装或删除软件以及管理系统文件和目录等任务，必须将特权升级到root用户。大多数设备都仅受root控制，但也有些设备并非如此，比如USB设备。root用户拥有可破坏系统的无限制权限：删除文件和目录，删除用户账户，添加后门等。
+
+利用su切换用户
+su命令可让用户切换至另一个用户账户，如果未指定用户名，则意味着使用root账户，当作为普通用户调用时，系统将提示输入要切换到的账户的密码；当作为root用户调用时，则无需输入账户密码：su [-] <username>
+命令su username启动非登录shell，而命令su - username启动登录shell，主要区别是，su -会将shell环境设置为如同以该用户身份完全登录一样，而su仅以该用户身份使用当前的环境设置启动shell。
+su #不会切换当前工作路径，就不会去读取用户家目录下的环境变量文件
+su - #会切换到用户的家目录，并且读取用户家目录下的环境变量文件
+
+su root命令和su - root命令区别就是：
+su只是切换了root身份，但Shell环境仍然是普通用户的Shell；而su -连用户和Shell环境一起切换成root身份了。su切换成root用户以后，pwd一下，发现工作目录仍然是普通用户的工作目录；而用su -命令切换以后，工作目录变成root的工作目录了。用echo $PATH命令看一下su和su - 后的环境变量已经变了。
+
+通过sudo以root身份运行命令
+sudo命令用来以其他身份来执行命令，分权，把root的权限分给普通用户预设的身份为root。在/etc/sudoers中设置了可执行sudo指令的用户。若其未经授权的用户企图使用sudo，则会发出警告的邮件给管理员。用户使用sudo时，必须先输入其自己的密码进行身份验证，而不是输入他们正在尝试访问的账户的密码，之后有5分钟的有效期限，超过期限则必须重新输入密码。通过sudo执行的所有命令都默认将日志记录到/var/log/secure中。
+配置sudo必须通过编辑/etc/sudoers文件，而且只有超级用户才可以修改它，还必须使用visudo编辑。不要直接使用vi和 vim去修改，因为这两个工具不会去检查语法，用visudo工具去编辑，这个工具会间接调用vim。之所以使用visudo有两个原因，一是它能够防止两个用户同时修改它；二是它也能进行有限的语法检查。所以，即使只有你一个超级用户，你也最好用visudo来检查一下语法。键入“e”是重新编辑，键入“x”是不保存退出，键入“Q”是退出并保存。如果真选择Q，那么sudo将不会再运行，直到错误被纠正。
+ 
+为一个普通用户分权
+visudo
+	授权用户/组    主机名=（允许转换至的用户）   NOPASSWD:命令动作
+	tt ALL=(ALL) NOPASSWD:/usr/sbin/fdisk  
+	#tt，表示能使用sudo命令的用户
+	#root	ALL=(ALL) 	ALL  ALL(ALL)，第一个ALL，表示允许从任何主机登录都可以使用sudo命令，第二个ALL，表示使用sudo后，可以使用任何身份来执行命令。最后一个ALL当然就是指命令名了	
+	#NOPASSWD: 表示执行后面的命令不需要输入用户密码。如果没这句，首次执行fdisk命令会提示你输入当前用户的密码，如果5分钟还没输入密码就会自动退出。如果通过验证，下次再使用这个命令就不需要输密码了。
+	#/usr/sbin/fdisk，这是fdisk命令的全路径
+
+ 
+用户的别名
+如果多个用户都要做同样的操作怎么办呢？
+作别名，相当于一个组，把多个用户加入这个别名，然后对这个别名分权。
+注意：别名不能小写，必须大写
+visudo
+	User_Alias AA = user1, user2
+	AA ALL=(ALL) NOPASSWD:/usr/sbin/fdisk
+	 
+为一个用户组分权
+visudo
+	%group ALL=(ALL) NOPASSWD:/usr/sbin/fdisk
+	#只要属于group这个组的用户都可以使用fdisk这个命令
+	 
+命令的别名
+visudo
+	Cmnd_Alias CM = /usr/sbin/fdisk, /usr/sbin/useradd
+	CM ALL=(ALL) NOPASSWD:CM
+
+
+管理本地用户
+useradd 创建用户
+useradd username可在无选项的情况下运行时，为/etc/passwd的所有字段设置合理的默认值，默认情况下，useradd不设置任何有效密码，用户也必须等设定了密码后才能登陆。一些默认值从/etc/login.defs文件中读取，如有效UID的范围和默认密码的过期规则。此文件中的值仅在创建新用户时使用，更改此文件对任何现有用户毫无影响。
+-c 添加描述信息
+-g 指定主要组
+-G 指定附属组
+-d 指定家目录
+-s 指定shell
+-u 指定UID，注意，只能使用1000以上，并且不能和其它UID冲突
+	 
+usermod 更改用户信息
+-g 更改主要组
+-G 更改附属组，如果之前已经指定过附属组，会把该用户从之前附属组中删除
+-a 和-G结合使用，将用户附加到所给的补充组而不删除之前的补充组，如果要加入多个组，用空格隔开
+-d 更改用户的家目录，但不会将旧家目录中的文件移过去。
+-m 和-d结合使用，更改家目录时，文件一起移过去
+-s 更改用户的shell
+-L 锁定用户账号
+-U 解锁用户账号
+-c 向GECOS字段添加值，如全名
+	 
+userdel 删除一个用户
+userdel username可将用户从/etc/passwd中删除，但默认情况下保留主目录不变。
+-r 同时删除用户和家目录，如果不加这个选项，只删除用户，而家目录还在
+如果在未指定-r选项下使用userdel删除某一用户，系统将具有未分配用户id编号所拥有的文件。当由已删除用户创建的文件在该用户主目录之外存在时，也会发生这种情况。
+ 
+id  显示用户信息
+ 
+修改用户密码
+passwd username可用于设置用户的初始密码，或更改该用户密码
+root用户可以将密码设置成任何值，如果密码不符合最低建议标准，系统将显示消息，不过，之后会显示要求重新输入该密码，所有令牌也会成功更新。
+passwd
+	#更改当前用户的密码
+passwd user1
+	#更改user1这个用户的密码，但这种方式只有root才有权限。
+echo redhat |passwd --stdin sam
+	#这种方式也可以。
+ 
+管理补充组
+组必须存在后，用户才能添加到其中
+创建用户时，会自动创建一个和用户名一样的用户组
+groupadd groupname
+	-g 指定GID，注意，1000以上，不能冲突，如果不带选项，则使用/etc/login.defs文件中指定范围内的下一个可用GID，-r选项将使用/etc/login.defs文件中所列有效系统GID编号范围内的GID创建系统组。
+groupmod 命令用于将组名更改为GID映射
+	-n 更改用户组名称 -g选项用于指定新的GID
+groupdel 
+	删除一个用户组，如果组是任何现有用户的主要组，则它不能被删除，与usedel一样，请检查所有文件系统，确保不遗留由该组拥有的任何文件
+gpasswd
+	-a 添加用户到组 gpasswd -a username group
+	-d 从组中删除用户 gpasswd -d username group
+	
+Linux文件系统权限
+用户对文件的访问由文件权限控制。文件只具有三个应用权限的用户类别，文件归某一用户所有，通常是创建文件的用户，文件还归单个组所有，通常是创建该文件的主要用户组所有，但是可以进行更改，可以为所属用户，所属组和系统上的非用户和非所属组成员的所有其他用户设置不同的权限。用户权限覆盖组权限，从而覆盖其他权限。
+说权限之前，首先要知道身份，一个用户对一个文件只有3种身份：
+	1.拥有者 U
+	2.拥有组 G
+	3.其它人 O
+注：root用户是个特例，root拥有无上的权限。root组,也只是一个普通组。创建一个新文件或目录时，这个文件或目录的拥有者和拥有组，分别是创建这个文件的用户和这个用户的主要组。
+	 
+怎么知道一个用户是不是这个组的成员呢？
+id user
+	 
+具体权限：
+	r  用数字4代替
+	w 用数字2代替
+	x  用数字1代替
+	注：查看一个文件权限的时候，如果没有相应的权限就用一个横杠-表示
+	 
+权限对于目录和文件，意义不同：
+（1）对目录而言：
+	r,一个目录的内容是什么：子目录和子文件的名字而已，但子目录和子文件的属性不是存在父目录里的，所以只对父目录有r权限，并不能看到子目录和子文件的属性信息，可以ls命令查看目录内的文件列表。
+	w,在一个目录下创建、删除、修改子文件或子目录，需要对该目录有w权限
+	x,对于目录而言，x权限决定了一个用户是否cd到这个目录，可以用ls -l查看目录内的文件列表。并且不能查看这个目录下的文件或子目录的属性
+	X，只给目录x权限，目录内的文件，如果本身就有x权限，则给ugo加上x权限，如果本身不具备x权限，则不给文件x权限。
+	 
+ 
+（2）对文件而言：
+	对于linux而言，一个文件能不能执行，和文件名没关系，只和这个文件里有没有可执行代码和x权限。
+	对一个文件只有w权限，可以echo adafadsf >> file，但是不能用vim去编辑。因为vim这个工具首先需要去查看这个文件，所以对该文件还要有r权限才行。
+	对一个文件只有x权限，也是不能执行的，因为首先要能读到这个文件的内容，才能执行，所以还要加上r权限
+
+	请注意，用户通常对只读目录具有read和exec权限，因此他们可以列出目录并访问其内容，如果用户仅对某目录具有read的访问权限，可以列出其中文件的名称，但是其他信息（包括权限或时间戳）都不可用，也不可访问，如果用户仅对某目录具有exec的访问权限，则他们不能列出该目录中文件的名称，但是如果他们已知道对其具有读取权限的文件的名称，那么他们可以通过明确地指定文件名来访问该文件的内容。
+	在文件所在的目录中拥有写入权限的任何人都可以删除此文件，不论此文件本身的所有权或权限如何。
+一个用户能否对某个文件进行删除，取决于该用户在该文件所在的目录上的权限，而不是取决于在该文件上的权限，如果用户对目录有w权限，用户就能够删除该目录下的文件。
+	 
+注意：
+（1）只有root可以更改文件的拥有者
+（2）root可以把拥有组改成任何组
+（3）文件拥有者只能把拥有组改成自己所属的组(主组和附属组)，而不能改成其它非自己所属的组
+（4）root或文件的拥有者都可以修改拥有组的权限
+
+查看文件/目录权限和所有权
+ls命令的-l选项将展开文件列表，以包括文件和所有权的权限。-d选项可看到目录本身的扩展列表，阻止下降至该目录。
+更改文件/目录的权限
+用户从命令行更改权限的命令为chmod，是change mode的简称。chmod命令在要更改的文件或目录列表后面列出了权限说明，可使用符号或数值来发布此权限说明。
+符号法：
+chmod  WhoWhatWhich   file|directory
+Who指u、g、o、a（代表用户、组、其他、全部）
+What指+、-、=（代表添加、删除、精确设置）
+Which指r、w、x（代表读取、写入、执行）
+	chmod u=
+	chmod u+
+	chmod u-
+	chmod g=
+	chmod g+
+	chmod g-
+	chmod o=
+	chmod o+
+	chmod o-
+	chmod a=
+	chmod a+
+	chmod a-
+	 
+例：chmod u=rwx,g+w,o-w
+	= 覆盖原有权限
+	+ - 在原有权限基础上，加减
+	 
+如果没有权限，可以用u=---，或u=
+
+数值法
+chmod ### file|directory
+每个数字代表一个访问级别：用户、组、其他，UGO的模式
+#是r=4，w=2，x=1的和
+如果使用数值法，权限由3位（或在设置高级权限时为4位）8进制数来表示，单一的8进制数字0-7，也正是3位数所出现的可能数。 chmod 7 for=chmod 007 for
+用数字方式修改权限
+chmod 777
+	#第一个7,表示拥有者的权限之和
+	#第二个7，表示拥有组的权限之和
+	#第三个7，表示其它人的权限之和
+chmod -R 777 /tmp
+	#表示递归把/tmp目录下的所有子目录和子文件权限修改成777
+chmod命令支持-R选项以递归方式对整个目录树中的文件设置权限
+	 
+更改文件/目录的用户或组所有权
+新建的文件由创建该文件的用户所有，默认情况下，新文件的组所有权为创建该文件的主要用户组。使用chown命令可更改文件所有权。
+chown user /tmp/tt 更改文件所有权
+chown :group /tmp/tt 更改文件组所有权
+chgrp group /tmp/tt 更改文件组的所有权
+chown user:group /tmp/tt 同时更改所属主和组
+	#也可以加上-R，递归修改整个目录树的所有权
+只有root用户可以修改文件的所有权。不过，组所有权可以由root用户或者文件所有者来设置，root用户可将所有权授予任何组，而非root用户仅可以将所有权授予给他们所属的组。
+	 
+UMASK 反掩码，默认文件权限
+umask命令用来设置所创建文件和目录的默认权限。
+umask有4位数，第一位代表一项特别的安全特性，叫作粘着位（sticky bit），后面3位表示文件或目录对应的umask的8进制值。umask值只是个掩码，它会屏蔽掉不想授予该安全级别的权限。
+对目录而言，满权限是777,新建一个目录的时候，实现权限是：777（全权限）-umask
+对文件而言，满权限是666，新建一个文件的时候，实际权限是：666（全权限）-umask
+ 
+UID为199以内的用户（包括了root用户）
+默认umask是022
+目录实际权限：777-022=755
+文件实际权限：666-022=644
+	 
+UID大于199的用户
+默认umask是002
+目录实际权限：777-002=775
+文件实际权限：666-002=664
+	 
+umask
+	#查看当前用户的umask值
+	/etc/profile  全局
+	/etc/.bash profile 针对单用户
+Bash shell用户的系统默认umask在/etc/profile和/etc/bashrc文件中的定义的，用户可以在他们的.bash_profile和.bashrc文件中覆盖系统默认值。
+	 
+umask 777
+	#临时更改当前用户的umask值，重启会失效
+	 
+特殊权限
+
+SUID
+当一个用户去执行一条命令时
+1.这个用户是拿自己的身份去执行这个命令，所以当前用户首先要对该命令有rx权限，才可执行
+2.执行命令时，命令会拿当前用户的身份去处理相应文件，所以，当前用户还要对命令所处理的文件拥有相应的权限
+	 
+当一个用户去执行一个带有SUID的命令
+1.这个用户拿自己的身份去执行这个命令
+2.这个命令在执行过程中，会拿自己拥有者的身份，去对相应的文件进行相应的处理，也就是说以文件的用户的身份去运行命令，而不是以运行命令的用户身份。
+比如：passwd命令
+which passwd
+ll /bin/passwd
+
+检验/usr/bin/passwd文件的特殊权限，并验证特殊权限的应用过程：
+	[root@server ~]# ls -l /usr/bin/passwd
+	-rwsr-xr-x. 1 root root 27832 Jan 30  2014 /usr/bin/passwd
+	[root@server ~]# useradd user1
+	[root@server ~]# passwd user1
+	Changing password for user user1.
+	New password:
+	BAD PASSWORD: The password is shorter than 8 characters
+	Retype new password:
+	passwd: all authentication tokens updated successfully.
+	为用户user1设置密码之后，使用"su - user1"命令切换用户为user1，以检验SUID命令的工作过程：
+	[root@server ~]# su - user1
+	[user1@server ~]$ passwd
+	Changing password for user user1.
+	Changing password for user1.
+	(current) UNIX password:
+	用户user1执行密码重设passwd之后，无需设置密码，目的是为了验证设置有SUID权限的passwd命令真正的用户身份，接下来读者需要打开另一个终端，运行"ps aux |grep -i passwd"命令检查使用passwd命令的真正用户身份，如下所示：
+	[root@server ~]# ps aux |grep -i passwd
+	root       2788  0.0  0.1 168820  2004 pts/0    S+   02:03   0:00 passwd
+	root       2813  0.0  0.0 112644   972 pts/1    S+   02:06   0:00 grep --color=auto -i passwd
+取消"/usr/bin/passwd"命令的SUID权限，验证用户user1是否可以重设密码
+	[root@server ~]# chmod u-s /usr/bin/passwd
+	[root@server ~]# ls -l /usr/bin/passwd
+	-rwxr-xr-x. 1 root root 27832 Jan 30  2014 /usr/bin/passwd
+	[root@server ~]# su - user1
+	-rwxr-xr-x. 1 root root 27832 Jan 30  2014 /usr/bin/passwd
+	[user1@server ~]$ passwd
+	Changing password for user user1.
+	Changing password for user1.
+	(current) UNIX password:
+	New password:
+	Retype new password:
+	passwd: Authentication token manipulation error
+	如上所示，虽然用户user1可以执行passwd命令，由于user1没有权限修改/etc/shadow文件的内容，因此系统提示授权维护操作失败。
+	[root@server ~]# ps aux |grep -i passwd
+	user1      2883  0.0  0.1 168820  1960 pts/1    S+   02:18   0:00 passwd
+	root       2888  0.0  0.0 112644   976 pts/0    R+   02:18   0:00 grep --color=auto -i passwd
+ 
+总结
+1.SUID只针对二进制文件才有效
+2.执行该二进制文件的用户，对于该二进制文件要有x权限
+3.该二进制文件的拥有者，对于该二进制文件所处理的文件，要有相应的权限
+	 
+如果拥有者的x位变成s，表示设置了suid，并且拥有者也设置了x权限
+如果变成S,表示只设置了suid，而拥有者自身并没有x权限
+	 
+命令
+chmod u+s
+chmod u-s
+	 
+SGID:
+针对一个二进制可执行文件而言，和SUID一样
+针对一个目录而言，在一个带SGID权限的目录下创建一个子文件或子目录时，会继承该目录的拥有组
+	 
+如果拥有组的x位变成s，表示设置了guid，并且拥有组也设置了x权限
+如果变成S,表示只设置了guid，而拥有组没有设置x权限
+SGID对文件共享非常重要，启用SGID位后，你可以强制在一个共享目录下创建的新文件都属于该目录的属组，这个组也就成为了每个用户的属组。
+ 
+命令
+chmod g+s
+chmod g-s
+
+在当前主机的目录树结构中创建一个目录为/dir，添加一个组，组名为sgid。设置/dir目录有效组为sgid，之后添加两个用户帐号分别为user2、user3，并授权user2、user3可以在/dir目录新建文件以便测试/dir目录上的SGID权限是否生效，如下所示：
+[root@server ~]# mkdir /dir
+[root@server ~]# chmod 777 /dir
+[root@server ~]# ls -ld /dir
+drwxrwxrwx. 2 root root 6 Mar 16 02:21 /dir
+[root@server ~]# groupadd sgid
+[root@server ~]# chgrp sgid /dir
+[root@server ~]# chmod g+s /dir
+[root@server ~]# useradd user2
+[root@server ~]# useradd user3
+[root@server ~]# useradd user4
+ 
+[root@server ~]# su - user2
+Last login: Wed Mar 15 02:09:30 CST 2017 on pts/0
+[user2@server ~]$ touch /dir/user2
+[user2@server ~]$ ll /dir/user2
+-rw-rw-r--. 1 user2 sgid 0 Mar 16 02:25 /dir/user2
+ 
+[root@server ~]# su - user3
+[user3@server ~]$ touch /dir/user3
+[user3@server ~]$ ll /dir/user3
+-rw-rw-r--. 1 user3 sgid 0 Mar 16 02:27 /dir/user3
+并且将结果重定向到test08_05.text(如没有此用户与文件，自行创建)
+	 
+STICBIT:粘贴位
+只对目录有效
+当一个目录的x位权限为t时，那么这个目录下的子文件或子目录，只有两个人可以删，一个是这个子目录或子文件的拥有者，一个是root，也就是该目录的粘滞位可以为文件删除设置特殊权限：仅文件所有者（和root）用户可以删除目录中的文件。
+	 
+命令
+chmod o+t
+chmod o-t
+为/dir目录设置STICKY权限，控制目录内的文件仅允许root和文件拥有者才能删除或修改相应的文件
+	[root@server ~]# chmod o+t /dir
+	[root@server ~]# ls -ld /dir
+	drwxrwsrwt. 2 root sgid 30 Mar 16 02:27 /dir
+	[root@server ~]# su - user2
+	Last login: Thu Mar 16 02:36:57 CST 2017 on pts/0
+	[user2@server ~]$ rm -f /dir/user2
+	[user2@server ~]$ rm -f /dir/user3
+	rm: cannot remove ‘/dir/user3’: Operation not permitted
+
+
+
+什么是进程？
+所谓进程，它是已启动的可执行程序的运行中实例，换句话说，一个正在运行中的程序，我们叫进程。
+进程有以下组成部分：
+已分配内存的地址空间，安全属性，包括所有权凭据和特权，程序代码的一个或多个执行线程以及进程状态。
+进程的环境包括：
+本地和全局变量，当前调度上下文，以及分配的系统资源。
+每个新进程分配到一个唯一的进程ID（PID）以满足跟踪和安全需要。PID和父级的进程ID（PPID）是新进程的环境的元素。任何进程可创建子进程。在RHEL7系统上，第一个系统进程是systemd（1）。
+通常，父进程在子进程运行期间处于睡眠状态，设置一个在子进程完成时发出信号的请求（wait），在退出时，子进程可能已经关闭或丢弃了其资源和环境，剩余的部分称为僵停。父进程在子进程退出时收到信号而被唤醒，清理剩余的结构，然后继续执行其自己的程序代码。
+ 
+进程的安全属性
+对于一个进程而言，也有一个拥有者，是谁在执行这个可执行文件
+passwd
+ps -elf |grep passwd
+ 
+变量
+变量分为全局变量和局部变量
+在linux里，进程之间是有父子关系的，形成一个树形结构
+全局变量会被子进程继承
+局部变量不会被子进程继承
+ 
+例：
+export xx=ls
+	#设置一个全局变量
+zz=kk
+	#设置一个局部变量
+su - tt
+echo $xx
+echo $zz
+ 
+进程的状态
+在多任务处理操作系统中，由于每个CPU核心任何时间内仅能运行一个进程，所以CPU需要一种调度算法来公平的分配CPU时间，这时，多个进程就处于不同状态：
+ 
+R	running，正在运行或正在运行队列中等待
+S	sleeping，可中断的睡眠状态，一般指进程在等待某个事件的发生，而被挂起，比如：服务进程，在没有连接时，就处于sleeping状态，等待有人来连接时再被唤醒，节省资源
+D	不可中断的睡眠状态，无法通过kill杀掉它，除非reboot。这种状态一般是因为进程在等待I/O，比如：磁盘I/O，网络I/O等，这时，很可能I/O设备出故障了
+T	暂停或停止状态，被用户暂停或进程正在被调试
+Z	僵尸状态，也就是说进程运行结束，内存也被释放，但是没有从进程表中删除，程序有BUG
+X	当父进程清理（获取）剩余的子进程结构时，进程现在已彻底释放。此状态不会在进程列出实用程序中看到，死掉的进程
+ 
+    <    高优先级
+    N    低优先级
+    L    有些页被锁进内存
+    s    包含子进程
+    +    位于后台的进程组；
+    l    多线程，克隆线程  multi-threaded (using CLONE_THREAD, like NPTL pthreads do)
+
+列出进程
+ps命令用于列出当前的进程，该命令可以提供详细的进程信息：
+用户识别号UID，唯一进程识别符PID，CPU和已经花费的实时时间，进程在各种位置上的分配的内存数量，进程的位置STDOUT，称为控制终端，以及当前进程的状态。
+ps 
+	#如果不带任何选项，仅查看当前shell中的进程
+ps -l 
+	#可以查看当前终端进程的父进程，也就是echo $$查看到的bash进程
+F：内核分配给进程的系统标记  S:进程的状态（O代表正在运行，S代表休眠，R代表可运行，正在等待运行，Z代表僵停，进程已结束但父进程已不存在，T代表停止）  PRI：进程的优先级（越大的数字代表越低的优先级） NI：谦让度值用来参与决定优先级  ADDR：进程的内存地址  SZ：假如进程被换出，所需交换空间的大致大小  WCHAN：进程休眠的内核参数地址
+ps -aux |more
+	#常用方法
+	#-a 查看所有终端下的进程，还有和终端无关的进程显示不出来
+	#TIME 这个进程从触发到现在，共占用了多少CPU时间
+	#-au 多了更多内容，但是还是针对所有终端的
+	#VSZ 虚拟内存空间，也就是程序运行时，申请的内存大小
+	#RSS 进程占用的实际物理内存
+	#-aux 可以显示所有的进程
+	#TTY以?显示的，表示这个进程和终端无关
+			 
+ps -elf | more
+	#e，表示查看所有的进程
+	#l，表示以更详细的显示
+	#f，显示更完整
+C:进程生命周期中的CPU利用率  TTY：进程启动时的终端设备 TIME：运行进程需要的累计CPU时间
+ 
+ps -axjf 
+	#以树形结构列出进程间关系
+	 
+pstree #yum install psmisc
+	#查看进程之间的父子关系
+	 
+pstree -Aup 常用方法
+	#-A 显示出树形结构
+	#-u 显示用户id
+	#-p 显示PID
+[root@server ~]# pstree -A |grep ping
+        |-sshd---sshd-+-bash---ping
+ 
+pgrep
+pgrep -f postfix  
+	#把以htt开头的服务进程的PID显示出来
+pgrep -x postfix 
+	#精确匹配一个服务名称
+pgrep -ln postfix 
+	#显示服务的最后启动的进程
+pgrep -lo postfix 
+	#显示服务最先启动的进程
+	
+uptime
+ uptime命令能够打印系统总共运行了多长时间和系统的平均负载。uptime命令可以显示的信息显示依次为：现在时间、系统已经运行了多长时间、目前有多少登陆用户、系统在过去的1分钟、5分钟和15分钟内的平均负载。
+[root@LinServ-1 ~]# uptime -V    #显示uptime命令版本信息
+procps version 3.2.7
+[root@LinServ-1 ~]# uptime
+ 15:31:30 up 127 days,  3:00,  1 user,  load average: 0.00, 0.00, 0.00
+15:31:30             //系统当前时间
+up 127 days,? 3:00   //主机已运行时间,时间越大，说明你的机器越稳定。
+1 user               //用户连接数，是总连接数而不是用户数
+load average: 0.00, 0.00, 0.00         // 系统平均负载，统计最近1，5，15分钟的系统平均负载
+系统平均负载是指在特定时间间隔内运行队列中的平均进程数。
+
+ w命令用于显示已经登陆系统的用户列表，并显示用户正在执行的指令。执行这个命令可得知目前登入系统的用户有那些人，以及他们正在执行的程序。单独执行w命令会显示所有的用户，您也可指定用户名称，仅显示某位用户的相关信息。
+-h：不打印头信息；
+-u：当显示当前进程和cpu时间时忽略用户名；
+-s：使用短输出格式；
+-f：显示用户从哪登录；
+-V：显示版本信息。
+
+w
+ 20:39:37 up 136 days,  3:58,  1 user,  load average: 0.00, 0.00, 0.00
+USER     TTY      FROM              login@   IDLE   JCPU   PCPU WHAT
+root     pts/0    222.94.97.122    20:39    1.00s  0.00s  0.00s w
+JCPU指的是与该tty终端连接的所有进程占用的时间，不包括过去的后台作业时间；PCPU 指的是当前进程(即w项中显示的)所占用的时间。
+
+
+top
+top命令跟PS命令相似，能够显示进程信息，但它是实时显示的，输出的第一部分显示的系统的概况，第一行显示了当前时间，系统运行时间，登录的用户数以及系统的平均负载。平均负载有3个值：最近1分钟，最近5分钟和最近15分钟的平均负载，值越大说明系统负载越高。由于进程短期的突发性活动，出现最近1分钟的高负载值也很常见，但如果近15分钟内的平均负载都很高，就说明系统可能有问题。
+动态显示系统的进程情况，默认每3秒刷新一次
+时间		#系统当前时间
+up 		#系统运行时间
+load average  #CPU的平均负载，也可用uptime命令查看 
+
+第二行显示了进程的概要信息，包括：
+tasks 		#多少个任务处在运行，休眠，停止，或是僵停的状态（进程完成了，但父进程没有响应）
+下一行显示CPU的概要信息
+cpu  	#cpu使用情况
+紧随其后两行说明了内存的状态，第一行说的是系统的物理内存：总共有多少内存，当前用了多少，还有多少空闲，后一行说明的是同样的信息，不过针对系统的交换空间的状态而言。
+mem 		#内存使用情况
+swap 		#虚拟内存使用情况
+
+最后一行显示当前运行中的进程的详细列表，有些列跟ps命令的输出类似。 
+PID 	进程的PID
+USER 用户
+PR 	优先级
+NI 	PR+NI才是这个进程真正的优先级
+VIRT	虚拟内存
+RES 实际内存
+SHR	共享内存，两个进程间会共享内存页
+S 进程状态，D：不可中断睡眠 R：运行中或可运行 S：睡眠中 T：已停止或已跟踪 Z：僵停
+%CPU CPU百分比
+%MEM 内存的百分比
+TIME+	CPU的占用时间
+COMAND	进程文件
+	 
+命令：
+？帮助
+P 按CPU的百分比来排序
+M 按内存的百分比来排序
+N 以PID来排序
+q 退出
+	 
+top -d 2 -n 3 
+	#每2秒刷新一次，共刷新3次
+top -d 2 -n 3 -p PID 
+	#查找固定进程的资源使用情况
+	 
+vmstat
+vmstat 1 3
+	#每一秒刷新一次，刷新3次
+	 
+lsof  #yum install lsof   list open file
+	#查看系统打开的文件 
+lsof -i:80
+	#查看80端口被谁占用
+	 
+
+进程的中断
+进程管理进程，kill也是一个进程，发出一个信号对进程进行操作
+信号是传递至进程的软件中断，信号向执行中的程序报告。生成信号的事件可以是错误或外部事件，或者来自于明确请求。在Linux中，进程之间通过信号来通信。
+
+kill -30等待任务完成后，再停程序
+用户可以向当前的前台进程发送信号，具体操作为按下键盘控制序列以暂停ctrl+z，终止ctrl+c或核心转储ctrl+\该进程。用户可以中断自己的进程，但需要root特权才能终止由其他人拥有的进程。
+
+ 
+kill命令的作用：
+1.杀掉进程，注意：根进程（systemd或init）是杀不掉的
+2.向指定的进程或进程组发送信号，对进程进行控制
+3.确定进程是否还在
+ 
+kill命令语法：
+kill
+方法1：通过jobs命令查看job号（假设为num），然后执行kill %num
+方法2：通过ps命令查看job的进程号（PID，假设为pid），然后执行kill pid
+方法3：kill -信号 PID，只会杀掉指定的单个进程，不带信号选项，默认用15信号
+前台进程的终止：Ctrl+c
+	
+killall -信号 进程名字	
+#批量杀进程
+#将名称匹配的进程全部杀掉
+使用killall可发送信号到一个或多个与选择条件匹配的进程，如命令名称，由特定用户拥有的进程，或者系统范围内的所有进程。killall命令非常强大，它支持通过进程名而不是PID来结束进程，killall命令也支持通配符，这在系统因负载过大而变得很慢时很有用：killall http*
+
+pkill 进程名字
+#和killall一样，也可以向多个进程发送信号，也pkill使用高级选择条件，可包含以下条件组合：
+命令-具有模式匹配的命令名称的进程  UID-由某一linux用户账户拥有的进程，无论是有效的还是真实的
+GID-由某一Linux组账户拥有的进程，无论是有效的还是真实的  父级-特定父进程的子进程 终端-运行于特定控制终端的进程
+	 
+信号：
+0	用来检测进程是否存在，并不杀死进程
+	如：killall -0 httpd，如果什么输出都没有，表示有这个进程，否则，会输出告诉你没有这个进程。
+	也可用echo $?来检测killall -0 httpd命令是否执行成功，不支持进程名字通配符
+	 
+1	表示挂起，让这个进程去重新加载配置文件，一般用于服务，用短称HUP代替1也可以。
+	比如：改httpd的配置文件，把端口号改成8080，
+	kill -l
+	#查看kill命令的信号列表
+	killall -1 httpd
+	lsof -i:80
+	lsof -i:8080
+	 
+2	表示键盘中断，向处于前台的进程发送一个终止运行的信号，如：ctrl+c
+	例：ping 8.8.8.8，这时，给这个进程发送一个2号信号，该进程就被终止了
+3	表示键盘退出，和信号2的作用类似，但在杀死进程的同时，又将进程启动了。如：ctrl+\
+	例：ping 8.8.8.8，这时，给这个进程发送一个3号信号，就掉一个包
+9	表示中断，无法拦截，不能正常结束的进程，可用信号9强制杀掉。
+	killall -9 httpd 把httpd服务全杀掉，用-9杀掉的进程，比较难再启动，相当于直接把电源拔掉
+15	表示终止，正常终止进程，相当于正常关机，如果kill命令不带任何选项，默认就是这个信号。
+18	继续，让暂停的进程继续运行，如：fg、bg命令
+19	暂停，将一个程序暂停运行，如:ctrl+z，将一个进程放到后台，并暂停运行
+
+
+以管理员身份注销用户
+w命令可查看当前登录系统的用户，以及他们积累的活动。通过TTY和FROM列确定用户的位置。使用-f选项时，远程用户在FROM列中显示其连接系统名称。
+可以逐一向进程和会话发送信号，也可以集体发送，要终止一个用户的所有进程，可使用pkill命令。中断某一用户的所有进程和登录shell需要使用SIGKILL信号。pgrep -l -u username   pkll -SIGKILL -u username
+当需要注意的进程在同个会话中时，可能不需要中断用户的所有进程，通过w命令确定会话的控制终端，然后仅终端引用同一终端ID的进程，除非指定了SIGKILL，否则会话首进程可以成功处理终止请求并保留，但所有其他会话进程将被终止。pgrep -l -u username  w -h -u username pkill -t ttyx  pkill -SIGKILL -t ttyx
+也可以利用父进程和子进程关系来应用相同的选择性终止，使用pstree命令查看系统或单个用户的进程树，使用父进程的PID中断其创建的所有子进程，此时，父进程bash登录shell可以保留，因为信号仅定向至它的子进程。
+pstree -p username  pkill -P PPID
+
+last命令用来查看登录Linux的历史信息，从左往右依次是账户名称，登录终端，登录客户端IP，登录日期及时长，last命令输出的信息实际上是读取了二进制日志文件/var/log/wtmp，只是这个文件不能直接使用cat，vim，head，tail等工具。
+	 
+控制作业
+作业控制是shell的一种功能，允许单个shell实例运行和管理多个命令。而作业与shell提示符中输入的每个
+相关联，该管道中的所有进程均是作业的一部分，并且是同一个进程组的成员。
+
+作业：Shell分前后台来控制的不是进程而是作业（Job）或者进程组（Process Group）。一个前台作业可以由多个进程组成，一个后台也可以由多个进程组成，Shell可以运行一个前台作业和任意多个后台作业，这称为作业控制。
+作业与进程组的区别：如果作业中的某个进程又创建了子进程，则子进程不属于作业。一旦作业运行结束，Shell就把自己提到前台，如果原来的前台进程还存在（如果这个子进程还没终止），它自动变为后台进程组。
+
+会话：由于Linux是多用户多任务的分时系统，所以必须要支持多个用户同时使用一个操作系统。当一个用户登录一次系统就形成一次会话 。一个会话可包含多个进程组，但只能有一个前台进程组。每个会话都有一个会话首领（leader），即创建会话的进程。 sys_setsid()调用能创建一个会话。必须注意的是，只有当前进程不是进程组的组长时，才能创建一个新的会话。调用setsid 之后，该进程成为新会话的leader。
+一个会话可以有一个控制终端。这通常是登陆到其上的终端设备（在终端登陆情况下）或伪终端设备（在网络登陆情况下）。建立与控制终端连接的会话首进程被称为控制进程。一个会话中的几个进程组可被分为一个前台进程组以及一个或多个后台进程组。所以一个会话中，应该包括控制进程（会话首进程），一个前台进程组和任意后台进程组。 
+一次登录形成一个会话
+一个会话可包含多个进程组，但只能有一个前台进程组
+PS命令将在TTY列中显示进程的控制终端的设备名称。某些进程（如系统守护进程）是由系统启动，并不是shell提示符启动，这些进程没有控制终端，也不是作业的成员，并且无法转至前台，PS命令将在TTY列中针对这些进程显示一个问号？。
+
+ping #当前终端就不能做其它操作了，这是因为当触发一个子进程的时候，父进程进入休眠状态，直到子进程退出
+ps -elf |grep ping 
+	#查看ping的父进程是2276
+ps -elf |grep 2276 
+	#查看父进程的状态
+	 
+只有作业控制，才可以让终端可以同时进行多个操作，比如：ping 10.0.0.1 &  #Ctrl+c无法也终止
+	 
+前台：占用终端界面，一个终端界面被占用，就不能做其它操作
+后台：不占用终端界面，当前看不见的操作，加了&
+不管前台，还是后台运行的进程，所有进程的父进程是bash
+
+任何命令或管道都可以在后台启动，只需要在命令的结尾处加上&符号即可，bash shell显示作业编号（特定于会话的唯一编号）和新建子进程的PID，shell不等待子进程，并且重新显示shell提示符。 
+ &
+加在一个命令的最后，可以把这个命令放到后台执行，如
+sleep 1000 &
+	#将sleep命令放到后台运行
+使用&符号让管道进入后台时，管道中最后一个命令的PID才是输出的PID，管道中的所有进程仍是该作业成员。 
+ctrl + z
+可以将一个正在前台执行的命令放到后台，并且处于暂停状态。
+ping 1.1.1.1
+ctrl+z
+ 
+jobs
+查看当前有多少在后台运行的命令
+jobs -l
+	#显示所有任务的PID
+	#jobs的状态可以是running, stopped, terminated
+	#但是如果任务被终止了（kill），shell 从当前的shell环境已知的列表中删除任务的进程标识
+	#+表示当前的作业
+ fg
+将后台中的命令调至前台继续运行。如果后台中有多个命令，可以用fg %jobnumber（是作业编号，不是进程号）将选中的命令调出。
+fg %1
+	#将后台运行的命令编号为1的进程调到前台执行
+ 
+bg
+将一个在后台暂停的命令，变成在后台继续执行。如果后台中有多个命令，可以用bg %jobnumber将选中的命令调出。
+bg %2
+
+nohup
+实现让一个进程始终保持在后台运行，即使关闭当前的终端也没关系
+可以让一个进程的父进程变成1，和终端无关，脱机运行，除非关机
+nohup ping 10.0.0.1 &
+	#然后关掉当前终端，打开一个新终端
+ps -elf |grep ping 
+	#可以看到这个进程还在运行，并且终端变成?，父进程PID为1
+
+
+如果用户尝试退出带有暂停作业的终端窗口（会话）那么shell将发出警告，如果用户再次尝试立即退出，暂停的作业将被中断。 
+
+监控进程活动
+Linux内核将负载平均值指标计算为负载树的指数移动平均值，负载数是活动系统资源请求的CPU累计数。
+负载平均值是负载数计算例程的结果，整体而言，它指的是最近1分钟，5分钟，15分钟内系统活动数据的三个显示值的平均值。
+# 总核数 = 物理CPU个数 X 每颗物理CPU的核数 
+# 总逻辑CPU数 = 物理CPU个数 X 每颗物理CPU的核数 X 超线程数
+# 查看物理CPU个数
+cat /proc/cpuinfo| grep "physical id"| sort| uniq| wc -l
+# 查看每个物理CPU中core的个数(即核数)
+cat /proc/cpuinfo| grep "cpu cores"| uniq
+# 查看逻辑CPU的个数
+cat /proc/cpuinfo| grep "processor"| wc -l
+ 查看CPU信息（型号）
+cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c
+查看内 存信息
+# cat /proc/meminfo
+top、uptime、w和gnome-system-monitor显示负载平均值
+将显示的负载平均值除以系统中的逻辑CPU数，值低于1表示资源利用率较好，等待时间短，值高于1表示资源饱和，而且有一定的服务等待时间。
+
+实时进程监控
+top程序是系统进程的动态视图，显示一个摘要标题，以及与ps信息类似的进程或线程列表，与静态的ps输出不同，top以可配置的间隔持续刷新，而且也提供重新排列、排序和突出显示功能，用户配置可以保存，变为永久。
+
+df命令
+df命令可以让你很方便地查看所有已挂载磁盘的使用情况，一般常用的参数是-h，它会把输出中的磁盘空间按照用户易读的形式展示，通常用M来替代兆字节，用G替代吉字节，-T显示文件系统类型
+[root@abin ~]# df -Th
+Filesystem          Type      Size  Used Avail Use% Mounted on
+/dev/mapper/cl-root xfs        18G  3.8G   15G  21% /
+devtmpfs            devtmpfs  899M     0  899M   0% /dev
+tmpfs               tmpfs     911M     0  911M   0% /dev/shm
+tmpfs               tmpfs     911M  9.6M  902M   2% /run
+tmpfs               tmpfs     911M     0  911M   0% /sys/fs/cgroup
+/dev/sda1           xfs       197M  155M   42M  79% /boot
+tmpfs               tmpfs     183M     0  183M   0% /run/user/0
+
+du命令
+du命令可以显示某个特定目录（默认情况下是当前目录）的磁盘使用情况，用来快速判断系统上某个目录是不是有超大文件。du命令会显示当前目录下所有文件，目录和子目录的磁盘使用情况，以磁盘块为单位来表明每个文件或目录占用了多大的存储空间。每行输出左边的数值是每个文件或目录占用的磁盘块数。-c显示所有已列出文件总的大小，-h按用户易读的格式输出大小，-s显示每个输出参数的总计。
+
+
+简介systemd
+系统启动和服务进程由systemd系统和服务管理器进行管理，后来程序是在执行各种任务的后台等待或运行的进程。
+守护进程（daemon）：守护进程在系统启动时自动启动并持续运行至关机或被手动停止，按照惯例，许多守护进程的名称以字母d结束。在后持续运行的进程，常驻内存的进程。一般进程执行完就结束了，但守护进程被执行后，一直在后台持续运行，直到关机，或发出一个结束指令。常见的守护进程包括系统日志进程rsyslog、 web服务器httpd、邮件服务器sendmail和数据库服务器mysqld等。
+
+
+所谓服务，它通常指的是一个或多个守护进程，但启动或停止一项服务可能会对系统的状态进行一次性更改，不会留下守护进程之后继续运行。实现某一项功能的集合，我们称为一个service，而服务和服务之间是有依赖关系的，也就是说启动一个服务，可能还需要先启动另一个服务才可以。
+systemctl list-dependencies httpd.service
+ 
+一个服务可能有好几个守护进程，比如：httpd服务，systemctl status httpd，可查看到有多个守护进程
+rhel7以后所有的服务都有systemd来管理
+rhel7以前由init管理
+ 
+init
+在rhel7之前，都是用init来管理服务，但是管理工具用了多个，比如：服务是否开机启动，使用chkconfig；启动一个服务，用service，启动一个服务，通过执行/etc/init.d目录下的服务启动脚本来实现
+ 
+systemd
+systemctl命令用于管理各种类型的systemd对象，它们称为单元，可以通过systemctl -t help命令显示可用单元类型的列表。
+[root@abin ~]# systemctl -t help
+Available unit types:
+service
+socket
+busname
+target
+snapshot
+device
+mount
+automount
+swap
+timer
+path
+slice
+scope
+Systemd 可以管理所有系统资源。不同的资源统称为 Unit（单元）。
+• Service unit：系统服务
+• Target unit：多个 Unit 构成的一个组
+• Device Unit：硬件设备
+• Mount Unit：文件系统的挂载点
+• Automount Unit：自动挂载点
+• Path Unit：文件或路径
+• Scope Unit：不是由 Systemd 启动的外部进程
+• Slice Unit：进程组
+• Snapshot Unit：Systemd 快照，可以切回某个快照
+• Socket Unit：进程间通信的 socket
+• Swap Unit：swap 文件
+• Timer Unit：定时器
+
+systemd的功能就是管理其它服务
+systemd提供了一个统一管理工具：systemctl
+systemd把服务按功能进行分类，以单元（unit）的形式来体现，一个单元包含多个对象
+为了兼容性，rhel7中，部分服务，还是可以通过/etc/init.d/daemon的方式管理，但其实还是调用的systemctl来实现
+ 
+unit(单元)
+systemctl -t help  
+#查看所有单元
+#service，一般服务类型，主要是系统服务，包括服务器本身需要的服务和网络服务
+#socket，主机内部程序之间互相访问的服务类型
+#target，执行环境类型，比如：以图形化还是以命令行启动
+#device，和设备有关的服务
+#mount，和挂载有关的服务，比如：开机自动挂载
+#path，用于将服务的激活推迟到特定文件系统更改发生之后，这通常用于使用假脱机目录的服务，如打印系统
+systemctl 查询所有单元的状态  
+systemctl --type=service 查询服务单元的状态
+systemctl list-units --type=service 列出所有的服务单元
+systemctl list-unit-files --type=service 查看所有单元的已启动和已禁用的设置
+systemctl --failed --type=service  查看失败的服务
+ 
+服务状态
+可以通过systemctl status name.type查看服务的状态，如果未提供单元类型，则systemctl将显示服务单元的状态。
+
+控制服务
+更改配置文件或者对服务进行其他更新可能需要重新启动服务，可能需要停止不再使用的服务后，才能删除相关的软件，不常使用的服务可以在需要时由管理员手动启动。
+systemctl list-units --all
+	#列出系统中的所有服务
+systemctl list-units --type=service 
+	#只查看service这个单元的所有对象
+systemctl list-unit-files
+	#列出系统中的所有服务状态，是否开机自动启动
+	#disable 开机不启动
+	#enable 开机启动
+	#masked 隔离单元对象
+	#static 无法执行的对象，只作为单次运行
+ 
+status 状态
+systemctl status httpd.service
+	Loaded: loaded (/usr/lib/systemd/system/httpd.service; enabled)
+	#loaded 是否加载过这个单元对象的配置文件
+	#括号中，前面部分为配置文件，后面的enabled表示开机启动
+	Active: active (running)
+	#表示这个服务正在运行
+	#把这个服务stop之后，就是kill掉这个进程
+	 
+enable 开机启动
+systemctl enable httpd.service
+ 
+disable 开机不启动，禁用服务不会停止该服务
+systemctl disable httpd.service
+ 
+start 启动
+systemctl start httpd.service
+ 
+stop 停止
+systemctl stop httpd.service
+ 
+restart 重启
+systemctl restart httpd.service
+#先stop，再start
+	 
+reload 不关闭服务，重新加载配置文件，进程ID不会改变
+systemctl reload httpd.service
+ 
+is-active 是否正在运行
+systemctl is-active httpd.service
+ 
+is-enabled 是否开机启动
+systemctl is-enabled httpd.service
+ 
+set-default 设置默认操作环境
+systemctl set-default multi-user.target
+#命令行
+systemctl set-default graphical.target
+#图形化
+ 
+mask 屏蔽服务，也就是无论如何，也不允许某个服务启动，一般用于两个服务冲突，只能起一个，把另一个屏蔽
+systemctl mask iptables.service
+禁用disabled的服务不会在服务启动时自动启动，也不会被其他单元文件启动，但可以手动启动，屏蔽的服务无法手动启动，也不会自动启动 
+
+unmask 解除屏蔽
+systemctl unmask iptables.service
+
+systemctl命令摘要
+可以在运行中的系统上启动和停止服务，也可以在启用和禁用服务在系统启动时自动启动
+
+
+
